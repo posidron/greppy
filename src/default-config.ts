@@ -28,9 +28,10 @@ export const DEFAULT_PATTERNS: PatternConfig[] = [
   },
   {
     name: "Potential Memory Issues",
-    description: "Finds potential memory leak patterns",
+    description: "Finds potential memory allocation functions",
     tool: "ripgrep",
-    pattern: "(malloc|calloc|realloc)\\((?!.*free)",
+    pattern: "(malloc|calloc|realloc)\\(",
+    options: ["--pcre2"],
     severity: "warning",
   },
   {
@@ -46,5 +47,28 @@ export const DEFAULT_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "\\(.*\\s*\\+\\s*.*\\)\\s*\\*|\\*\\s*\\(.*\\s*\\+\\s*.*\\)",
     severity: "warning",
+  },
+
+  // Weggli patterns for C/C++
+  {
+    name: "Vulnerable Memcpy Usage",
+    description: "Detects potentially vulnerable memcpy calls",
+    tool: "weggli",
+    pattern: "{ _ $buf[_]; memcpy($buf,_,_); }",
+    severity: "critical",
+  },
+  {
+    name: "Missing NULL Check",
+    description: "Finds pointer dereferences without NULL checks",
+    tool: "weggli",
+    pattern: "{ _* $p; not: if ($p == NULL) _; not: if ($p != NULL) _; *$p; }",
+    severity: "warning",
+  },
+  {
+    name: "Use After Free Risk",
+    description: "Detects potential use-after-free vulnerabilities",
+    tool: "weggli",
+    pattern: "{ free($p); _($p); }",
+    severity: "critical",
   },
 ];
