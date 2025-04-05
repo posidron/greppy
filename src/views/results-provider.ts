@@ -18,6 +18,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
 
   private results: FindingResult[] = [];
   private patterns: Map<string, PatternConfig> = new Map();
+  private showWelcomeView: boolean = true;
 
   constructor(private context: vscode.ExtensionContext) {}
 
@@ -30,6 +31,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   update(results: FindingResult[], patterns: PatternConfig[]): void {
     this.results = results;
     this.patterns = new Map(patterns.map((pattern) => [pattern.name, pattern]));
+    this.showWelcomeView = results.length === 0;
     this._onDidChangeTreeData.fire();
   }
 
@@ -50,6 +52,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @returns The children of the element
    */
   getChildren(element?: TreeItem): Thenable<TreeItem[]> {
+    if (this.showWelcomeView) {
+      return Promise.resolve(this.getWelcomeViewItems());
+    }
+
     if (this.results.length === 0) {
       return Promise.resolve([
         {
@@ -70,6 +76,62 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
     }
 
     return Promise.resolve([]);
+  }
+
+  /**
+   * Create welcome view items with buttons.
+   */
+  private getWelcomeViewItems(): TreeItem[] {
+    return [
+      {
+        label: "Welcome to Greppy",
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        iconPath: new vscode.ThemeIcon("shield"),
+      },
+      {
+        label: "Run Security Analysis",
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        iconPath: new vscode.ThemeIcon("play"),
+        command: {
+          command: "greppy.runAnalysis",
+          title: "Run Security Analysis",
+        },
+        contextValue: "greppyAction",
+      },
+      {
+        label: "Select Pattern Set",
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        iconPath: new vscode.ThemeIcon("list-selection"),
+        command: {
+          command: "greppy.selectPatternSet",
+          title: "Select Pattern Set",
+        },
+        contextValue: "greppyAction",
+      },
+      {
+        label: "Edit Patterns",
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        iconPath: new vscode.ThemeIcon("gear"),
+        command: {
+          command: "greppy.editPatterns",
+          title: "Edit Patterns",
+        },
+        contextValue: "greppyAction",
+      },
+      {
+        label: "View Documentation",
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        iconPath: new vscode.ThemeIcon("book"),
+        command: {
+          command: "markdown.showPreview",
+          title: "View Documentation",
+          arguments: [
+            vscode.Uri.file(path.join(this.context.extensionPath, "README.md")),
+          ],
+        },
+        contextValue: "greppyAction",
+      },
+    ];
   }
 
   /**

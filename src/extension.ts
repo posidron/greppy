@@ -13,9 +13,6 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize pattern sets
   PatternManager.initializeDefaultPatternSets();
 
-  // Show a welcome notification
-  showWelcomeNotification();
-
   // Initialize services
   const grepService = new GrepService(context);
   const resultsProvider = new GrepResultsProvider(context);
@@ -27,10 +24,16 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(treeView);
 
+  // Initialize the view with empty results to show welcome screen
+  resultsProvider.update([], []);
+
   // Open the Greppy view container automatically
   setTimeout(() => {
     vscode.commands.executeCommand("workbench.view.extension.greppy-container");
   }, 1000);
+
+  // Show a welcome notification
+  showWelcomeNotification();
 
   // Register commands - log their registration
   console.log("Registering greppy.runAnalysis command");
