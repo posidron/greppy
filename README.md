@@ -1,41 +1,38 @@
-
 <div align="center">
   <img src="images/logo-alpha.png" alt="Greppy Logo" width="412px" height="412px">
 </div>
 
-Greppy is a continuous static analysis tool for Visual Studio Code with a focus on security. It enables you to define and run security-focused search patterns across your codebase using either ripgrep or weggli.
-
+<div align="center">
+  <h1>Greppy</h1>
+  <p><strong>A continuous static analysis tool for Visual Studio Code with a focus on security.</strong></p>
+  <p>Define and run security-focused search patterns across your codebase using ripgrep or weggli.</p>
+</div>
 
 <p align="center">
   <img src="images/greppy-screenshot.png" alt="Greppy Screenshot" width="800"/>
 </p>
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Extension Settings](#extension-settings)
-  - [Pattern Configuration](#pattern-configuration)
-- [Example Patterns](#example-patterns)
-  - [Ripgrep Patterns](#ripgrep-patterns)
-  - [Weggli Patterns](#weggli-patterns)
-- [Usage](#usage)
-- [Extension Development](#extension-development)
-  - [Building and Packaging](#building-and-packaging)
-  - [Running Tests](#running-tests)
-  - [Installing the Extension](#installing-the-extension)
-    - [From VSIX File](#from-vsix-file)
-    - [For Development](#for-development)
-  - [Troubleshooting](#troubleshooting)
+<div align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-requirements">Requirements</a> •
+  <a href="#-extension-settings">Settings</a> •
+  <a href="#-example-patterns">Examples</a> •
+  <a href="#-usage">Usage</a> •
+  <a href="#-extension-development">Development</a>
+</div>
 
+---
 
-## Features
+## ✨ Features
 
-- Define custom search patterns using ripgrep or weggli
-- Organize findings by pattern with severity levels
-- Click on findings to navigate directly to the corresponding code
-- Automatic analysis of your workspace
-- Support for C, C++, and any other language that can be analyzed with text patterns
+- 🔍 Define custom search patterns using ripgrep or weggli
+- 🏷️ Organize findings by pattern with severity levels
+- 🖱️ Click on findings to navigate directly to the corresponding code
+- 🔄 Automatic analysis of your workspace
+- 🌐 Support for C, C++, and any other language that can be analyzed with text patterns
+- 🚫 Ability to ignore/acknowledge findings that aren't relevant
 
-## Requirements
+## 🛠️ Requirements
 
 - ripgrep (`rg`) must be installed for ripgrep patterns
 - weggli must be installed for weggli patterns (optional)
@@ -54,7 +51,7 @@ apt-get install ripgrep
 cargo install weggli
 ```
 
-## Extension Settings
+## ⚙️ Extension Settings
 
 This extension contributes the following settings:
 
@@ -62,7 +59,7 @@ This extension contributes the following settings:
 * `greppy.ripgrepPath`: Path to the ripgrep executable (default: "rg")
 * `greppy.weggliPath`: Path to the weggli executable (default: "weggli")
 
-### Pattern Configuration
+### 📝 Pattern Configuration
 
 Each pattern in the `greppy.patterns` array should have the following structure:
 
@@ -86,9 +83,9 @@ Available fields:
 - `options`: (Optional) Array of command-line options to pass to the tool
 - `severity`: Severity level - "info", "warning", or "critical"
 
-## Example Patterns
+## 📋 Example Patterns
 
-### Ripgrep Patterns
+### 🔎 Ripgrep Patterns
 
 ```json
 {
@@ -110,7 +107,7 @@ Available fields:
 }
 ```
 
-### Weggli Patterns
+### 🔬 Weggli Patterns
 
 ```json
 {
@@ -133,21 +130,22 @@ Available fields:
 }
 ```
 
-## Usage
+## 📖 Usage
 
 1. Configure your patterns in VS Code settings
 2. Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS)
 3. Run the "Greppy: Run Security Analysis" command
 4. View results in the Greppy Results panel in the Explorer sidebar
 5. Click on findings to navigate to the corresponding code
+6. Hover over a finding to see more details or ignore it if it's not relevant
 
-## Extension Development
+## 👨‍💻 Extension Development
 
-### Building and Packaging
+### 🏗️ Building and Packaging
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/your-username/greppy.git
+   git clone https://github.com/posidron/greppy.git
    cd greppy
    ```
 
@@ -171,7 +169,7 @@ Available fields:
    ```
    This will generate a `greppy-0.0.1.vsix` file (or similar, depending on the version).
 
-### Running Tests
+### 🧪 Running Tests
 
 Greppy has a comprehensive test suite to ensure the extension functions correctly. The tests cover the core functionality, such as filtering findings, the tree view display, and the decoration service.
 
@@ -195,14 +193,10 @@ Greppy has a comprehensive test suite to ensure the extension functions correctl
    npm run watch-tests
    ```
 
-The test suite includes:
-- Unit tests for the `DecoratorService` that verify finding filtering and ignore functionality
-- Unit tests for the `GrepResultsProvider` that validate the tree view generation
-- Integration tests that ensure the components work together correctly
 
 If you're adding new features, please make sure to add corresponding tests to maintain code quality.
 
-### Installing the Extension
+### 📦 Installing the Extension
 
 #### From VSIX File
 1. Open VS Code
@@ -216,11 +210,25 @@ If you're adding new features, please make sure to add corresponding tests to ma
 2. Press F5 to open a new window with the extension loaded
 3. Run "Greppy: Run Security Analysis" to test the extension
 
-### Troubleshooting
+### ❓ Troubleshooting
 
 If you encounter an error like "Extension 'Mantiqo.greppy' not found":
 1. Make sure you've correctly built and installed the extension as described above
 2. Check that the `publisher` field in `package.json` matches the publisher name used in the error message
 3. Try reloading VS Code after installation
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License.
 
 
