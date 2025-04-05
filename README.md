@@ -1,9 +1,14 @@
 
 <div align="center">
-  <img src="/images/logo-alpha.png" alt="Greppy Logo" width="412px" height="412px">
+  <img src="images/logo-alpha.png" alt="Greppy Logo" width="412px" height="412px">
 </div>
 
 Greppy is a continuous static analysis tool for Visual Studio Code with a focus on security. It enables you to define and run security-focused search patterns across your codebase using either ripgrep or weggli.
+
+
+<p align="center">
+  <img src="images/greppy-screenshot.png" alt="Greppy Screenshot" width="800"/>
+</p>
 
 - [Features](#features)
 - [Requirements](#requirements)
