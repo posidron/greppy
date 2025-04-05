@@ -18,6 +18,7 @@ export interface FindingResult {
   filePath: string;
   lineNumber: number;
   matchedContent: string;
+  codeIndicator?: string;
   timestamp: number;
 }
 

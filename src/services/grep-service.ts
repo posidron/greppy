@@ -148,6 +148,46 @@ export class GrepService {
   }
 
   /**
+   * Get code indicator based on file extension
+   *
+   * @param filePath The path of the file
+   * @returns The code indicator string for the file
+   */
+  private getCodeIndicator(filePath: string): string {
+    const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";
+
+    if (["js", "ts", "jsx", "tsx"].includes(fileExtension)) {
+      return "js";
+    } else if (["py"].includes(fileExtension)) {
+      return "python";
+    } else if (["c", "cpp", "h", "hpp"].includes(fileExtension)) {
+      return "c";
+    } else if (["java"].includes(fileExtension)) {
+      return "java";
+    } else if (["go"].includes(fileExtension)) {
+      return "go";
+    } else if (["php"].includes(fileExtension)) {
+      return "php";
+    } else if (["rb"].includes(fileExtension)) {
+      return "ruby";
+    } else if (["html", "htm"].includes(fileExtension)) {
+      return "html";
+    } else if (["css", "scss", "sass", "less"].includes(fileExtension)) {
+      return "css";
+    } else if (["json"].includes(fileExtension)) {
+      return "json";
+    } else if (["xml"].includes(fileExtension)) {
+      return "xml";
+    } else if (["md", "markdown"].includes(fileExtension)) {
+      return "markdown";
+    } else if (["sh", "bash"].includes(fileExtension)) {
+      return "bash";
+    } else {
+      return fileExtension || "text";
+    }
+  }
+
+  /**
    * Parse ripgrep output into FindingResult objects.
    *
    * @param output The output from ripgrep
@@ -191,6 +231,9 @@ export class GrepService {
         continue;
       }
 
+      // Get code indicator based on file extension
+      const codeIndicator = this.getCodeIndicator(filePath);
+
       results.push({
         id: uuidv4(),
         patternName: pattern.name,
@@ -200,6 +243,7 @@ export class GrepService {
         filePath,
         lineNumber,
         matchedContent,
+        codeIndicator,
         timestamp,
       });
     }
@@ -262,6 +306,9 @@ export class GrepService {
         }
       }
 
+      // Get code indicator based on file extension
+      const codeIndicator = this.getCodeIndicator(filePath);
+
       results.push({
         id: uuidv4(),
         patternName: pattern.name,
@@ -271,6 +318,7 @@ export class GrepService {
         filePath,
         lineNumber,
         matchedContent,
+        codeIndicator,
         timestamp,
       });
     }

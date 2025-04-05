@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { PatternManager } from "./patterns/pattern-manager";
+import { DecoratorService } from "./services/decorator-service";
 import { GrepService } from "./services/grep-service";
 import { GrepResultsProvider } from "./views/results-provider";
 
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize services
   const grepService = new GrepService(context);
   const resultsProvider = new GrepResultsProvider(context);
+  const decoratorService = new DecoratorService();
 
   // Register the tree data provider
   const treeView = vscode.window.createTreeView("greppyResults", {
@@ -116,6 +118,9 @@ export function activate(context: vscode.ExtensionContext) {
             // Update the tree view
             resultsProvider.update(results, patterns);
 
+            // Update the code decorations
+            decoratorService.updateFindings(results);
+
             // Show a summary notification
             vscode.window.showInformationMessage(
               `Analysis complete. Found ${results.length} results.`
@@ -179,12 +184,22 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register a command to clear code decorations
+  const clearDecorationsCommand = vscode.commands.registerCommand(
+    "greppy.clearDecorations",
+    () => {
+      decoratorService.updateFindings([]);
+      vscode.window.showInformationMessage("Greppy code indicators cleared");
+    }
+  );
+
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
   context.subscriptions.push(showWelcomeCommand);
   context.subscriptions.push(editPatternsCommand);
   context.subscriptions.push(selectPatternSetCommand);
+  context.subscriptions.push(clearDecorationsCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(

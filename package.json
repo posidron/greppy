@@ -41,6 +41,17 @@
         "title": "Greppy: Select Pattern Set",
         "category": "Greppy",
         "icon": "$(list-selection)"
+      },
+      {
+        "command": "greppy.clearDecorations",
+        "title": "Greppy: Clear Code Indicators",
+        "category": "Greppy",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "greppy.ignoreFinding",
+        "title": "Greppy: Ignore Finding",
+        "category": "Greppy"
       }
     ],
     "keybindings": [
@@ -85,6 +96,11 @@
           "command": "greppy.selectPatternSet",
           "when": "view == greppyResults",
           "group": "navigation"
+        },
+        {
+          "command": "greppy.clearDecorations",
+          "when": "view == greppyResults",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -102,6 +118,13 @@
         },
         {
           "command": "greppy.selectPatternSet"
+        },
+        {
+          "command": "greppy.clearDecorations"
+        },
+        {
+          "command": "greppy.ignoreFinding",
+          "when": "false"
         }
       ]
     },
