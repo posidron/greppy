@@ -4,7 +4,7 @@
   "description": "A continuous static analysis tool with focus on security",
   "version": "0.0.1",
   "publisher": "Mantiqo",
-  "icon": "images/icon.png",
+  "icon": "images/logo-alpha.png",
   "engines": {
     "vscode": "^1.75.0"
   },

@@ -1,26 +1,25 @@
-# Greppy
+
+<div align="center">
+  <img src="images/logo-alpha.png" alt="Greppy Screenshot" width="412px" height="412px">
+</div>
 
 Greppy is a continuous static analysis tool for Visual Studio Code with a focus on security. It enables you to define and run security-focused search patterns across your codebase using either ripgrep or weggli.
 
-![Greppy Screenshot](images/greppy-screenshot.svg)
-
-
-- [Greppy](#greppy)
-  - [Features](#features)
-  - [Requirements](#requirements)
-  - [Extension Settings](#extension-settings)
-    - [Pattern Configuration](#pattern-configuration)
-  - [Example Patterns](#example-patterns)
-    - [Ripgrep Patterns](#ripgrep-patterns)
-    - [Weggli Patterns](#weggli-patterns)
-  - [Usage](#usage)
-  - [Extension Development](#extension-development)
-    - [Building and Packaging](#building-and-packaging)
-    - [Running Tests](#running-tests)
-    - [Installing the Extension](#installing-the-extension)
-      - [From VSIX File](#from-vsix-file)
-      - [For Development](#for-development)
-    - [Troubleshooting](#troubleshooting)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Extension Settings](#extension-settings)
+  - [Pattern Configuration](#pattern-configuration)
+- [Example Patterns](#example-patterns)
+  - [Ripgrep Patterns](#ripgrep-patterns)
+  - [Weggli Patterns](#weggli-patterns)
+- [Usage](#usage)
+- [Extension Development](#extension-development)
+  - [Building and Packaging](#building-and-packaging)
+  - [Running Tests](#running-tests)
+  - [Installing the Extension](#installing-the-extension)
+    - [From VSIX File](#from-vsix-file)
+    - [For Development](#for-development)
+  - [Troubleshooting](#troubleshooting)
 
 
 ## Features
