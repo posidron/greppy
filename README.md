@@ -120,10 +120,54 @@ Available fields:
 
 ## Extension Development
 
+### Building and Packaging
+
 1. Clone this repository
-2. Run `npm install`
-3. Press F5 to open a new window with your extension loaded
-4. Run "Greppy: Run Security Analysis" to test the extension
+   ```bash
+   git clone https://github.com/your-username/greppy.git
+   cd greppy
+   ```
+
+2. Install dependencies
+   ```bash
+   npm install
+   ```
+
+3. Build the extension
+   ```bash
+   npm run package
+   ```
+
+4. Create a VSIX package
+   ```bash
+   # Install the vsce packaging tool if you don't have it
+   npm install -g @vscode/vsce
+
+   # Create the package
+   vsce package
+   ```
+   This will generate a `greppy-0.0.1.vsix` file (or similar, depending on the version).
+
+### Installing the Extension
+
+#### From VSIX File
+1. Open VS Code
+2. Go to the Extensions view (Ctrl+Shift+X or Cmd+Shift+X on macOS)
+3. Click on the "..." menu in the top right of the Extensions view
+4. Select "Install from VSIX..."
+5. Navigate to and select the `greppy-0.0.1.vsix` file
+
+#### For Development
+1. Open the project in VS Code
+2. Press F5 to open a new window with the extension loaded
+3. Run "Greppy: Run Security Analysis" to test the extension
+
+### Troubleshooting
+
+If you encounter an error like "Extension 'Mantiqo.greppy' not found":
+1. Make sure you've correctly built and installed the extension as described above
+2. Check that the `publisher` field in `package.json` matches the publisher name used in the error message
+3. Try reloading VS Code after installation
 
 ## Known Issues
 
