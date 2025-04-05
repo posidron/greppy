@@ -3,6 +3,7 @@
   "displayName": "Greppy",
   "description": "A continuous static analysis tool with focus on security",
   "version": "0.0.1",
+  "publisher": "Mantiqo",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -30,6 +31,18 @@
         "command": "greppy.showWelcome",
         "title": "Greppy: Show Welcome",
         "category": "Greppy"
+      },
+      {
+        "command": "greppy.editPatterns",
+        "title": "Greppy: Edit Security Patterns",
+        "category": "Greppy",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "greppy.selectPatternSet",
+        "title": "Greppy: Select Pattern Set",
+        "category": "Greppy",
+        "icon": "$(list-selection)"
       }
     ],
     "keybindings": [
@@ -63,6 +76,16 @@
           "command": "greppy.refreshResults",
           "when": "view == greppyResults",
           "group": "navigation"
+        },
+        {
+          "command": "greppy.editPatterns",
+          "when": "view == greppyResults",
+          "group": "navigation"
+        },
+        {
+          "command": "greppy.selectPatternSet",
+          "when": "view == greppyResults",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -74,6 +97,12 @@
         },
         {
           "command": "greppy.showWelcome"
+        },
+        {
+          "command": "greppy.editPatterns"
+        },
+        {
+          "command": "greppy.selectPatternSet"
         }
       ]
     },
@@ -83,7 +112,7 @@
         "greppy.patterns": {
           "type": "array",
           "default": [],
-          "description": "Pattern definitions for security analysis",
+          "description": "Custom pattern definitions for security analysis. These will be used alongside the active pattern set.",
           "items": {
             "type": "object",
             "required": ["name", "description", "tool", "pattern"],
@@ -117,6 +146,56 @@
                 "enum": ["info", "warning", "critical"],
                 "default": "warning",
                 "description": "Severity level of findings for this pattern"
+              }
+            }
+          }
+        },
+        "greppy.activePatternSet": {
+          "type": "string",
+          "default": "general",
+          "enum": ["general", "cpp", "web", "none"],
+          "description": "The active set of predefined patterns to use. Set to 'none' to use only custom patterns."
+        },
+        "greppy.patternSets": {
+          "type": "object",
+          "default": {},
+          "description": "Predefined pattern sets for different technologies. These are merged with custom patterns.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "description", "tool", "pattern"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the pattern"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description of what this pattern checks for"
+                },
+                "tool": {
+                  "type": "string",
+                  "enum": ["ripgrep", "weggli"],
+                  "description": "Tool to use for this pattern"
+                },
+                "pattern": {
+                  "type": "string",
+                  "description": "Search pattern for the tool"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional command-line options to pass to the tool"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": ["info", "warning", "critical"],
+                  "default": "warning",
+                  "description": "Severity level of findings for this pattern"
+                }
               }
             }
           }

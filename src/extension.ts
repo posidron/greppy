@@ -1,8 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { DEFAULT_PATTERNS } from "./default-config";
-import { PatternConfig } from "./models/types";
+import { PatternManager } from "./patterns/pattern-manager";
 import { GrepService } from "./services/grep-service";
 import { GrepResultsProvider } from "./views/results-provider";
 
@@ -10,6 +9,9 @@ import { GrepResultsProvider } from "./views/results-provider";
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
   console.log("Greppy extension is now active");
+
+  // Initialize pattern sets
+  PatternManager.initializeDefaultPatternSets();
 
   // Show a welcome notification
   showWelcomeNotification();
@@ -73,31 +75,36 @@ export function activate(context: vscode.ExtensionContext) {
         },
         async (progress, token) => {
           try {
-            // Get patterns from settings
-            let patterns = vscode.workspace
-              .getConfiguration("greppy")
-              .get<PatternConfig[]>("patterns", []);
+            // Get patterns from pattern manager
+            const patterns = PatternManager.getPatterns();
 
-            // If no patterns are configured, use default patterns
+            // If no patterns, show a message
             if (patterns.length === 0) {
-              patterns = DEFAULT_PATTERNS;
-              // Inform the user that default patterns are being used
               vscode.window
                 .showInformationMessage(
-                  "No patterns configured. Using default patterns. Configure custom patterns in settings.",
-                  "Open Settings"
+                  "No patterns configured. Please add patterns or select a pattern set.",
+                  "Edit Patterns",
+                  "Select Pattern Set"
                 )
                 .then((selection) => {
-                  if (selection === "Open Settings") {
-                    vscode.commands.executeCommand(
-                      "workbench.action.openSettings",
-                      "greppy.patterns"
-                    );
+                  if (selection === "Edit Patterns") {
+                    vscode.commands.executeCommand("greppy.editPatterns");
+                  } else if (selection === "Select Pattern Set") {
+                    vscode.commands.executeCommand("greppy.selectPatternSet");
                   }
                 });
+              return [];
             }
 
-            // Run the analysis with the provided patterns
+            // Show which pattern set is being used
+            const activeSet = vscode.workspace
+              .getConfiguration("greppy")
+              .get<string>("activePatternSet", "general");
+            vscode.window.showInformationMessage(
+              `Running analysis with the "${activeSet}" pattern set.`
+            );
+
+            // Run the analysis with the patterns
             const results = await grepService.runAnalysis(
               workspaceFolder,
               patterns
@@ -152,10 +159,29 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  const editPatternsCommand = vscode.commands.registerCommand(
+    "greppy.editPatterns",
+    () => {
+      vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        "greppy.patterns"
+      );
+    }
+  );
+
+  const selectPatternSetCommand = vscode.commands.registerCommand(
+    "greppy.selectPatternSet",
+    async () => {
+      await PatternManager.selectPatternSet();
+    }
+  );
+
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
   context.subscriptions.push(showWelcomeCommand);
+  context.subscriptions.push(editPatternsCommand);
+  context.subscriptions.push(selectPatternSetCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(
@@ -177,7 +203,9 @@ function showWelcomeNotification() {
     .showInformationMessage(
       "Greppy security analysis extension is now active! Run security analysis on your code.",
       "Run Analysis",
-      "Open Panel"
+      "Open Panel",
+      "Edit Patterns",
+      "Select Pattern Set"
     )
     .then((selection) => {
       if (selection === "Run Analysis") {
@@ -186,6 +214,10 @@ function showWelcomeNotification() {
         vscode.commands.executeCommand(
           "workbench.view.extension.greppy-container"
         );
+      } else if (selection === "Edit Patterns") {
+        vscode.commands.executeCommand("greppy.editPatterns");
+      } else if (selection === "Select Pattern Set") {
+        vscode.commands.executeCommand("greppy.selectPatternSet");
       }
     });
 }
