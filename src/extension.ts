@@ -16,8 +16,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize services
   const grepService = new GrepService(context);
-  const resultsProvider = new GrepResultsProvider(context);
-  const decoratorService = new DecoratorService();
+  const decoratorService = new DecoratorService(context);
+  const resultsProvider = new GrepResultsProvider(context, decoratorService);
 
   // Register the tree data provider
   const treeView = vscode.window.createTreeView("greppyResults", {
@@ -115,10 +115,9 @@ export function activate(context: vscode.ExtensionContext) {
               patterns
             );
 
-            // Update the tree view
+            // Update the tree view and decorations with the same set of results
+            // The decorator service will filter out ignored findings internally
             resultsProvider.update(results, patterns);
-
-            // Update the code decorations
             decoratorService.updateFindings(results);
 
             // Show a summary notification
@@ -193,6 +192,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register a command to refresh the results tree view
+  const refreshResultsTreeCommand = vscode.commands.registerCommand(
+    "greppy.refreshResultsTree",
+    () => {
+      // Cause the tree view to refresh
+      resultsProvider.refresh();
+    }
+  );
+
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
@@ -200,6 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(editPatternsCommand);
   context.subscriptions.push(selectPatternSetCommand);
   context.subscriptions.push(clearDecorationsCommand);
+  context.subscriptions.push(refreshResultsTreeCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(

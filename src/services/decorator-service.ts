@@ -16,7 +16,10 @@ export class DecoratorService {
   // Store ignored findings to persist across sessions
   private ignoredFindings: Set<string> = new Set();
 
-  constructor() {
+  // Storage key for ignored findings
+  private readonly IGNORED_FINDINGS_KEY = "greppy.ignoredFindings";
+
+  constructor(private context?: vscode.ExtensionContext) {
     // Listen for active editor changes to apply decorations
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {
@@ -46,6 +49,50 @@ export class DecoratorService {
         this.ignoreFinding(findingId);
       }
     );
+
+    // Load ignored findings from storage if context is provided
+    this.loadIgnoredFindings();
+  }
+
+  /**
+   * Load ignored findings from storage
+   */
+  private loadIgnoredFindings(): void {
+    if (this.context) {
+      try {
+        const ignoredFindingsJson = this.context.globalState.get<string[]>(
+          this.IGNORED_FINDINGS_KEY,
+          []
+        );
+
+        this.ignoredFindings = new Set(ignoredFindingsJson);
+        console.log(
+          `Loaded ${this.ignoredFindings.size} ignored findings from storage`
+        );
+      } catch (error) {
+        console.error("Error loading ignored findings:", error);
+      }
+    }
+  }
+
+  /**
+   * Save ignored findings to storage
+   */
+  private saveIgnoredFindings(): void {
+    if (this.context) {
+      try {
+        const ignoredFindingsArray = Array.from(this.ignoredFindings);
+        this.context.globalState.update(
+          this.IGNORED_FINDINGS_KEY,
+          ignoredFindingsArray
+        );
+        console.log(
+          `Saved ${ignoredFindingsArray.length} ignored findings to storage`
+        );
+      } catch (error) {
+        console.error("Error saving ignored findings:", error);
+      }
+    }
   }
 
   /**
@@ -76,6 +123,27 @@ export class DecoratorService {
     if (activeEditor) {
       this.applyDecorations(activeEditor);
     }
+  }
+
+  /**
+   * Returns findings filtered to exclude ignored findings
+   * For use by the results provider
+   *
+   * @param findings The findings to filter
+   * @returns Filtered findings without ignored ones
+   */
+  public getFilteredFindings(findings: FindingResult[]): FindingResult[] {
+    return findings.filter((finding) => !this.ignoredFindings.has(finding.id));
+  }
+
+  /**
+   * Check if a finding is ignored
+   *
+   * @param findingId The ID of the finding to check
+   * @returns Whether the finding is ignored
+   */
+  isIgnored(findingId: string): boolean {
+    return this.ignoredFindings.has(findingId);
   }
 
   /**
@@ -227,6 +295,9 @@ export class DecoratorService {
     // Add to ignored set
     this.ignoredFindings.add(findingId);
 
+    // Save to storage
+    this.saveIgnoredFindings();
+
     // Update all editors
     this.updateDecorationsAfterIgnore();
 
@@ -260,6 +331,9 @@ export class DecoratorService {
     if (activeEditor) {
       this.applyDecorations(activeEditor);
     }
+
+    // Fire an event to notify the tree view to update
+    vscode.commands.executeCommand("greppy.refreshResultsTree");
   }
 
   /**

@@ -7,6 +7,7 @@ import {
   PatternTreeItem,
   TreeItem,
 } from "../models/types";
+import { DecoratorService } from "../services/decorator-service";
 
 export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<
@@ -20,7 +21,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private patterns: Map<string, PatternConfig> = new Map();
   private showWelcomeView: boolean = true;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private decoratorService: DecoratorService
+  ) {}
 
   /**
    * Update the results shown in the TreeView.
@@ -29,9 +33,30 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @param patterns The patterns used for the results
    */
   update(results: FindingResult[], patterns: PatternConfig[]): void {
-    this.results = results;
+    // Filter out any ignored findings using the decorator service
+    const filteredResults = this.decoratorService.getFilteredFindings(results);
+
+    this.results = filteredResults;
     this.patterns = new Map(patterns.map((pattern) => [pattern.name, pattern]));
-    this.showWelcomeView = results.length === 0;
+    this.showWelcomeView = filteredResults.length === 0;
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Explicitly refresh the tree view without changing the results
+   * Called when ignored findings change
+   */
+  refresh(): void {
+    // Re-filter the existing results to account for newly ignored findings
+    if (this.results.length > 0) {
+      const filteredResults = this.decoratorService.getFilteredFindings(
+        this.results
+      );
+      this.results = filteredResults;
+      this.showWelcomeView = filteredResults.length === 0;
+    }
+
+    // Fire event to refresh the tree view
     this._onDidChangeTreeData.fire();
   }
 

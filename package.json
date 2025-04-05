@@ -52,6 +52,11 @@
         "command": "greppy.ignoreFinding",
         "title": "Greppy: Ignore Finding",
         "category": "Greppy"
+      },
+      {
+        "command": "greppy.refreshResultsTree",
+        "title": "Greppy: Refresh Results Tree",
+        "category": "Greppy"
       }
     ],
     "keybindings": [
@@ -124,6 +129,10 @@
         },
         {
           "command": "greppy.ignoreFinding",
+          "when": "false"
+        },
+        {
+          "command": "greppy.refreshResultsTree",
           "when": "false"
         }
       ]
