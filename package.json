@@ -1,0 +1,167 @@
+{
+  "name": "greppy",
+  "displayName": "Greppy",
+  "description": "A continuous static analysis tool with focus on security",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "greppy.runAnalysis",
+        "title": "Greppy: Run Security Analysis",
+        "category": "Greppy"
+      },
+      {
+        "command": "greppy.refreshResults",
+        "title": "Greppy: Refresh Results",
+        "category": "Greppy",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "greppy.showWelcome",
+        "title": "Greppy: Show Welcome",
+        "category": "Greppy"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "greppy.runAnalysis",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g",
+        "when": "editorTextFocus"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "greppy-container",
+          "title": "Greppy",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "greppy-container": [
+        {
+          "id": "greppyResults",
+          "name": "Security Analysis Results"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "greppy.refreshResults",
+          "when": "view == greppyResults",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "greppy.runAnalysis"
+        },
+        {
+          "command": "greppy.refreshResults"
+        },
+        {
+          "command": "greppy.showWelcome"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Greppy",
+      "properties": {
+        "greppy.patterns": {
+          "type": "array",
+          "default": [],
+          "description": "Pattern definitions for security analysis",
+          "items": {
+            "type": "object",
+            "required": ["name", "description", "tool", "pattern"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the pattern"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what this pattern checks for"
+              },
+              "tool": {
+                "type": "string",
+                "enum": ["ripgrep", "weggli"],
+                "description": "Tool to use for this pattern"
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Search pattern for the tool"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Optional command-line options to pass to the tool"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["info", "warning", "critical"],
+                "default": "warning",
+                "description": "Severity level of findings for this pattern"
+              }
+            }
+          }
+        },
+        "greppy.ripgrepPath": {
+          "type": "string",
+          "default": "rg",
+          "description": "Path to ripgrep executable"
+        },
+        "greppy.weggliPath": {
+          "type": "string",
+          "default": "weggli",
+          "description": "Path to weggli executable"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "eslint": "^9.23.0",
+    "typescript": "^5.8.2",
+    "ts-loader": "^9.5.2",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "@types/uuid": "^9.0.8"
+  },
+  "dependencies": {
+    "execa": "^8.0.1",
+    "uuid": "^9.0.1"
+  }
+}
