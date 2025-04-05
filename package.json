@@ -146,7 +146,12 @@
           "description": "Custom pattern definitions for security analysis. These will be used alongside the active pattern set.",
           "items": {
             "type": "object",
-            "required": ["name", "description", "tool", "pattern"],
+            "required": [
+              "name",
+              "description",
+              "tool",
+              "pattern"
+            ],
             "properties": {
               "name": {
                 "type": "string",
@@ -158,7 +163,10 @@
               },
               "tool": {
                 "type": "string",
-                "enum": ["ripgrep", "weggli"],
+                "enum": [
+                  "ripgrep",
+                  "weggli"
+                ],
                 "description": "Tool to use for this pattern"
               },
               "pattern": {
@@ -174,7 +182,11 @@
               },
               "severity": {
                 "type": "string",
-                "enum": ["info", "warning", "critical"],
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
                 "default": "warning",
                 "description": "Severity level of findings for this pattern"
               }
@@ -184,7 +196,12 @@
         "greppy.activePatternSet": {
           "type": "string",
           "default": "general",
-          "enum": ["general", "cpp", "web", "none"],
+          "enum": [
+            "general",
+            "cpp",
+            "web",
+            "none"
+          ],
           "description": "The active set of predefined patterns to use. Set to 'none' to use only custom patterns."
         },
         "greppy.patternSets": {
@@ -195,7 +212,12 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["name", "description", "tool", "pattern"],
+              "required": [
+                "name",
+                "description",
+                "tool",
+                "pattern"
+              ],
               "properties": {
                 "name": {
                   "type": "string",
@@ -207,7 +229,10 @@
                 },
                 "tool": {
                   "type": "string",
-                  "enum": ["ripgrep", "weggli"],
+                  "enum": [
+                    "ripgrep",
+                    "weggli"
+                  ],
                   "description": "Tool to use for this pattern"
                 },
                 "pattern": {
@@ -223,7 +248,11 @@
                 },
                 "severity": {
                   "type": "string",
-                  "enum": ["info", "warning", "critical"],
+                  "enum": [
+                    "info",
+                    "warning",
+                    "critical"
+                  ],
                   "default": "warning",
                   "description": "Severity level of findings for this pattern"
                 }
@@ -256,19 +285,21 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.75.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/sinon": "^17.0.4",
+    "@types/uuid": "^9.0.8",
+    "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
-    "eslint": "^9.23.0",
-    "typescript": "^5.8.2",
-    "ts-loader": "^9.5.2",
-    "webpack": "^5.98.0",
-    "webpack-cli": "^6.0.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "@types/uuid": "^9.0.8"
+    "eslint": "^9.23.0",
+    "sinon": "^17.0.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.2",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1"
   },
   "dependencies": {
     "execa": "^8.0.1",

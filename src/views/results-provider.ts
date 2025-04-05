@@ -223,14 +223,11 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private createFindingTreeItems(findings: FindingResult[]): FindingTreeItem[] {
     return findings.map((finding) => {
       const fileName = path.basename(finding.filePath);
-      const codeIndicator = finding.codeIndicator
-        ? `[${finding.codeIndicator}] `
-        : "";
 
       return {
         label: `${fileName}:${finding.lineNumber}`,
-        description: `${codeIndicator}${finding.matchedContent}`,
-        tooltip: `${finding.filePath}:${finding.lineNumber}\n${codeIndicator}${finding.matchedContent}`,
+        description: `${finding.matchedContent}`,
+        tooltip: `${finding.filePath}:${finding.lineNumber}\n${finding.matchedContent}`,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         finding,
         iconPath: this.getSeverityIcon(finding.severity),
