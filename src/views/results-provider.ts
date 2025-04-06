@@ -203,11 +203,12 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       items.push({
         label: `${patternName} (${findings.length})`,
         description: pattern.description,
-        tooltip: `${pattern.description}\nTool: ${pattern.tool}\nPattern: ${pattern.pattern}`,
+        tooltip: `${pattern.description}\nTool: ${pattern.tool}\nPattern: ${pattern.pattern}\nSeverity: ${pattern.severity}`,
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
         iconPath: severityIcon,
         pattern,
         findings,
+        resourceUri: vscode.Uri.parse(`greppy:pattern/${pattern.severity}`),
       });
     }
 
@@ -227,10 +228,11 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       return {
         label: `${fileName}:${finding.lineNumber}`,
         description: `${finding.matchedContent}`,
-        tooltip: `${finding.filePath}:${finding.lineNumber}\n${finding.matchedContent}`,
+        tooltip: `${finding.filePath}:${finding.lineNumber}\n${finding.matchedContent}\nSeverity: ${finding.severity}`,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         finding,
         iconPath: this.getSeverityIcon(finding.severity),
+        resourceUri: vscode.Uri.parse(`greppy:finding/${finding.severity}`),
         command: {
           command: "vscode.open",
           arguments: [
@@ -259,15 +261,57 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private getSeverityIcon(
     severity: "info" | "warning" | "critical"
   ): vscode.ThemeIcon {
+    let iconId: string;
+    let color: vscode.ThemeColor | undefined;
+
     switch (severity) {
       case "info":
-        return new vscode.ThemeIcon("info");
+        iconId = "info";
+        color = new vscode.ThemeColor("charts.blue");
+        break;
       case "warning":
-        return new vscode.ThemeIcon("warning");
+        iconId = "warning";
+        color = new vscode.ThemeColor("charts.yellow");
+        break;
       case "critical":
-        return new vscode.ThemeIcon("error");
+        iconId = "error";
+        color = new vscode.ThemeColor("charts.red");
+        break;
       default:
-        return new vscode.ThemeIcon("circle-outline");
+        iconId = "circle-outline";
+        color = undefined;
+    }
+
+    // If we can use the color property on ThemeIcon, do so
+    // This is technically not fully supported in the stable API yet,
+    // but is available in newer VS Code versions
+    try {
+      // @ts-ignore - Using unofficially supported property
+      return new vscode.ThemeIcon(iconId, color);
+    } catch (e) {
+      // Fallback to standard ThemeIcon without color
+      return new vscode.ThemeIcon(iconId);
+    }
+  }
+
+  /**
+   * Get the color for a severity level.
+   *
+   * @param severity The severity level
+   * @returns The ThemeColor for the severity
+   */
+  private getSeverityColor(
+    severity: "info" | "warning" | "critical"
+  ): vscode.ThemeColor {
+    switch (severity) {
+      case "info":
+        return new vscode.ThemeColor("charts.blue");
+      case "warning":
+        return new vscode.ThemeColor("charts.yellow");
+      case "critical":
+        return new vscode.ThemeColor("charts.red");
+      default:
+        return new vscode.ThemeColor("foreground");
     }
   }
 }
