@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import * as vscode from "vscode";
 import { DEFAULT_PATTERNS } from "../default-config";
 import { FindingResult, PatternConfig } from "../models/types";
+import { IdService } from "./id-service";
 
 // We'll use dynamic import for execa
 type ExecaFn = (
@@ -65,7 +66,12 @@ export class GrepService {
           pattern,
           workspaceFolder.uri.fsPath
         );
-        allResults.push(...results);
+
+        // Enhance each finding with context and persistent ID
+        for (const result of results) {
+          const enhancedFinding = await IdService.enhanceFinding(result);
+          allResults.push(enhancedFinding);
+        }
       } catch (error) {
         console.error(`Error executing pattern ${pattern.name}:`, error);
         vscode.window.showErrorMessage(
@@ -235,7 +241,7 @@ export class GrepService {
       const codeIndicator = this.getCodeIndicator(filePath);
 
       results.push({
-        id: uuidv4(),
+        id: uuidv4(), // We still need a unique ID for the current session
         patternName: pattern.name,
         patternDescription: pattern.description,
         tool: pattern.tool,
@@ -310,7 +316,7 @@ export class GrepService {
       const codeIndicator = this.getCodeIndicator(filePath);
 
       results.push({
-        id: uuidv4(),
+        id: uuidv4(), // We still need a unique ID for the current session
         patternName: pattern.name,
         patternDescription: pattern.description,
         tool: pattern.tool,

@@ -255,9 +255,9 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   /**
    * Get filtered results based on current severity filters
    */
-  private getFilteredResults(): FindingResult[] {
+  private async getFilteredResults(): Promise<FindingResult[]> {
     // First filter out ignored findings using decoratorService
-    const nonIgnoredResults = this.decoratorService.getFilteredFindings(
+    const nonIgnoredResults = await this.decoratorService.getFilteredFindings(
       this.results
     );
 
@@ -282,13 +282,16 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @param results The results to display
    * @param patterns The patterns used for the results
    */
-  update(results: FindingResult[], patterns: PatternConfig[]): void {
+  async update(
+    results: FindingResult[],
+    patterns: PatternConfig[]
+  ): Promise<void> {
     // Store the full results set
     this.results = results;
     this.patterns = new Map(patterns.map((pattern) => [pattern.name, pattern]));
 
     // Determine if we should show the welcome view based on filtered results
-    const filteredResults = this.getFilteredResults();
+    const filteredResults = await this.getFilteredResults();
     this.showWelcomeView = filteredResults.length === 0;
 
     this._onDidChangeTreeData.fire();
@@ -298,10 +301,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * Explicitly refresh the tree view without changing the results
    * Called when ignored findings change
    */
-  refresh(): void {
+  async refresh(): Promise<void> {
     // Re-filter the existing results to account for newly ignored findings
     if (this.results.length > 0) {
-      const filteredResults = this.getFilteredResults();
+      const filteredResults = await this.getFilteredResults();
       this.showWelcomeView = filteredResults.length === 0;
     }
 
@@ -325,32 +328,32 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @param element The tree element
    * @returns The children of the element
    */
-  getChildren(element?: TreeItem): Thenable<TreeItem[]> {
+  async getChildren(element?: TreeItem): Promise<TreeItem[]> {
     if (this.showWelcomeView) {
-      return Promise.resolve(this.getWelcomeViewItems());
+      return this.getWelcomeViewItems();
     }
 
-    const filteredResults = this.getFilteredResults();
+    const filteredResults = await this.getFilteredResults();
     if (filteredResults.length === 0) {
-      return Promise.resolve([
+      return [
         {
           label: "No results found",
           collapsibleState: vscode.TreeItemCollapsibleState.None,
         },
-      ]);
+      ];
     }
 
     if (!element) {
       // Root - show patterns with findings
       const patternGroups = this.groupResultsByPattern(filteredResults);
-      return Promise.resolve(this.createPatternTreeItems(patternGroups));
+      return this.createPatternTreeItems(patternGroups);
     } else if ("pattern" in element) {
       // Pattern - show findings for this pattern
       const patternItem = element as PatternTreeItem;
-      return Promise.resolve(this.createFindingTreeItems(patternItem.findings));
+      return this.createFindingTreeItems(patternItem.findings);
     }
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**

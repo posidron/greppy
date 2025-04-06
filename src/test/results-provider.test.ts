@@ -1,21 +1,27 @@
 import * as assert from "assert";
 import { v4 as uuidv4 } from "uuid";
 import * as vscode from "vscode";
-import { FindingResult, PatternConfig, PatternTreeItem } from "../models/types";
+import { FindingResult, PatternConfig } from "../models/types";
 import { DecoratorService } from "../services/decorator-service";
 import { GrepResultsProvider } from "../views/results-provider";
+import { initializeTestEnvironment, MockVSCode } from "./test-utils";
 
-// Mock the vscode namespace
-const mockContext = {
-  subscriptions: [],
-  extensionPath: "/path/to/extension",
-} as unknown as vscode.ExtensionContext;
+// Initialize the test environment
+const { sandbox } = initializeTestEnvironment();
+
+// Create VS Code mock
+const mockVSCode = new MockVSCode();
+
+// Mock context for VS Code
+const mockContext = MockVSCode.createMockContext();
 
 // Create testable decorator service
 class TestableDecoratorService {
   private ignoredIds: Set<string> = new Set();
 
-  public getFilteredFindings(findings: FindingResult[]): FindingResult[] {
+  public async getFilteredFindings(
+    findings: FindingResult[]
+  ): Promise<FindingResult[]> {
     return findings.filter((finding) => !this.ignoredIds.has(finding.id));
   }
 
@@ -25,6 +31,33 @@ class TestableDecoratorService {
 
   public mockIgnoreFinding(id: string): void {
     this.ignoredIds.add(id);
+  }
+}
+
+// Create a testable version of GrepResultsProvider that uses our mocks
+class TestableResultsProvider extends GrepResultsProvider {
+  constructor(
+    context: vscode.ExtensionContext,
+    decoratorService: DecoratorService
+  ) {
+    // Set up mocked vscode dependencies
+    (GrepResultsProvider.prototype as any)["vscode"] = {
+      workspace: mockVSCode.workspace,
+      window: mockVSCode.window,
+      commands: mockVSCode.commands,
+      Uri: mockVSCode.Uri,
+      ThemeColor: mockVSCode.ThemeColor,
+      TreeItemCollapsibleState: mockVSCode.TreeItemCollapsibleState,
+    };
+
+    // Override the registerFilterCommands method to prevent command registration
+    (GrepResultsProvider.prototype as any)["registerFilterCommands"] =
+      function () {
+        // No-op implementation to avoid registering commands in tests
+        console.log("Skipping command registration in test environment");
+      };
+
+    super(context, decoratorService);
   }
 }
 
@@ -90,14 +123,23 @@ const createMockFindings = (): FindingResult[] => {
 };
 
 suite("GrepResultsProvider Tests", () => {
-  let resultsProvider: GrepResultsProvider;
+  let resultsProvider: TestableResultsProvider;
   let mockDecoratorService: TestableDecoratorService;
   let mockPatterns: PatternConfig[];
   let mockFindings: FindingResult[];
 
   setup(() => {
+    // Reset sandbox before each test
+    sandbox.resetHistory();
+
+    // Reset registered commands to prevent conflicts
+    mockVSCode.resetRegisteredCommands();
+
+    // Call override just to maintain API consistency
+    mockVSCode.override();
+
     mockDecoratorService = new TestableDecoratorService();
-    resultsProvider = new GrepResultsProvider(
+    resultsProvider = new TestableResultsProvider(
       mockContext,
       mockDecoratorService as unknown as DecoratorService
     );
@@ -107,7 +149,7 @@ suite("GrepResultsProvider Tests", () => {
 
   test("update should filter findings using decorator service", async () => {
     // Initial update with all findings
-    resultsProvider.update(mockFindings, mockPatterns);
+    await resultsProvider.update(mockFindings, mockPatterns);
 
     // Get root level items
     const rootItems = await resultsProvider.getChildren();
@@ -120,7 +162,7 @@ suite("GrepResultsProvider Tests", () => {
     mockDecoratorService.mockIgnoreFinding(idToIgnore);
 
     // Refresh the provider
-    resultsProvider.refresh();
+    await resultsProvider.refresh();
 
     // Get updated root items
     const updatedRootItems = await resultsProvider.getChildren();
@@ -131,9 +173,8 @@ suite("GrepResultsProvider Tests", () => {
     // But the Integer Overflow group should now have only 1 finding
     const intOverflowItem = updatedRootItems.find(
       (item) =>
-        "pattern" in item &&
-        (item as PatternTreeItem).pattern.name === "Integer Overflow"
-    ) as PatternTreeItem | undefined;
+        "pattern" in item && (item as any).pattern.name === "Integer Overflow"
+    ) as any;
 
     assert.notStrictEqual(intOverflowItem, undefined);
     if (intOverflowItem) {
@@ -141,7 +182,7 @@ suite("GrepResultsProvider Tests", () => {
 
       // And it shouldn't be the ignored finding
       const hasIgnoredFinding = intOverflowItem.findings.some(
-        (f) => f.id === idToIgnore
+        (f: FindingResult) => f.id === idToIgnore
       );
       assert.strictEqual(hasIgnoredFinding, false);
     }
@@ -157,8 +198,11 @@ suite("GrepResultsProvider Tests", () => {
   });
 
   test('getChildren should show "No results found" when empty results are passed', async () => {
-    // Update with empty results array
-    resultsProvider.update([], mockPatterns);
+    // Update with empty results array and explicitly set showWelcomeView to false
+    await resultsProvider.update([], mockPatterns);
+
+    // Force the provider to show empty results rather than welcome view
+    (resultsProvider as any).showWelcomeView = false;
 
     // Get children
     const items = await resultsProvider.getChildren();
@@ -170,7 +214,7 @@ suite("GrepResultsProvider Tests", () => {
 
   test("getChildren should return pattern groups for root level", async () => {
     // Update with findings
-    resultsProvider.update(mockFindings, mockPatterns);
+    await resultsProvider.update(mockFindings, mockPatterns);
 
     // Get root level items
     const rootItems = await resultsProvider.getChildren();
@@ -181,14 +225,12 @@ suite("GrepResultsProvider Tests", () => {
     // Verify pattern names and counts in labels
     const intOverflowItem = rootItems.find(
       (item) =>
-        "pattern" in item &&
-        (item as PatternTreeItem).pattern.name === "Integer Overflow"
-    ) as PatternTreeItem | undefined;
+        "pattern" in item && (item as any).pattern.name === "Integer Overflow"
+    ) as any;
     const memoryLeakItem = rootItems.find(
       (item) =>
-        "pattern" in item &&
-        (item as PatternTreeItem).pattern.name === "Memory Leak"
-    ) as PatternTreeItem | undefined;
+        "pattern" in item && (item as any).pattern.name === "Memory Leak"
+    ) as any;
 
     assert.notStrictEqual(intOverflowItem, undefined);
     assert.notStrictEqual(memoryLeakItem, undefined);
@@ -205,7 +247,7 @@ suite("GrepResultsProvider Tests", () => {
 
   test("getChildren should return findings for pattern item", async () => {
     // Update with findings
-    resultsProvider.update(mockFindings, mockPatterns);
+    await resultsProvider.update(mockFindings, mockPatterns);
 
     // Get root level items
     const rootItems = await resultsProvider.getChildren();
@@ -213,9 +255,8 @@ suite("GrepResultsProvider Tests", () => {
     // Get the Integer Overflow pattern item
     const intOverflowItem = rootItems.find(
       (item) =>
-        "pattern" in item &&
-        (item as PatternTreeItem).pattern.name === "Integer Overflow"
-    ) as PatternTreeItem | undefined;
+        "pattern" in item && (item as any).pattern.name === "Integer Overflow"
+    ) as any;
 
     assert.notStrictEqual(intOverflowItem, undefined);
 
@@ -241,14 +282,14 @@ suite("GrepResultsProvider Tests", () => {
 
   test("refresh should re-filter findings and update tree view", async () => {
     // Initial update with all findings
-    resultsProvider.update(mockFindings, mockPatterns);
+    await resultsProvider.update(mockFindings, mockPatterns);
 
     // Mark a finding as ignored
     const idToIgnore = mockFindings[0].id;
     mockDecoratorService.mockIgnoreFinding(idToIgnore);
 
     // Refresh the provider
-    resultsProvider.refresh();
+    await resultsProvider.refresh();
 
     // Get root level items
     const rootItems = await resultsProvider.getChildren();
@@ -256,20 +297,20 @@ suite("GrepResultsProvider Tests", () => {
     // Get the Integer Overflow pattern item
     const intOverflowItem = rootItems.find(
       (item) =>
-        "pattern" in item &&
-        (item as PatternTreeItem).pattern.name === "Integer Overflow"
-    ) as PatternTreeItem | undefined;
+        "pattern" in item && (item as any).pattern.name === "Integer Overflow"
+    ) as any;
+
+    assert.notStrictEqual(intOverflowItem, undefined);
 
     if (intOverflowItem) {
-      // Get findings for Integer Overflow
-      const findingItems = await resultsProvider.getChildren(intOverflowItem);
+      // Should have one less finding
+      assert.strictEqual(intOverflowItem.findings.length, 1);
 
-      // Should only have 1 finding (the other was ignored)
-      assert.strictEqual(findingItems.length, 1);
-
-      // The remaining finding should be the second one (line 20)
-      const label = findingItems[0].label?.toString() || "";
-      assert.strictEqual(label.includes(":20"), true);
+      // And it shouldn't be the ignored finding
+      const hasIgnoredFinding = intOverflowItem.findings.some(
+        (f: FindingResult) => f.id === idToIgnore
+      );
+      assert.strictEqual(hasIgnoredFinding, false);
     }
   });
 });

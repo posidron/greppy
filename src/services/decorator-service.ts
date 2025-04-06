@@ -1,5 +1,9 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
-import { FindingResult } from "../models/types";
+// Re-importing with a slightly different format to clear any potential caching issues
+import type { FindingResult, IgnoredFinding } from "../models/types";
+import { IdService } from "./id-service";
 
 /**
  * Service responsible for decorating code editors with language indicators
@@ -16,8 +20,15 @@ export class DecoratorService {
   // Store ignored findings to persist across sessions
   private ignoredFindings: Set<string> = new Set();
 
-  // Storage key for ignored findings
-  private readonly IGNORED_FINDINGS_KEY = "greppy.ignoredFindings";
+  // Storage folder and file paths
+  private readonly STORAGE_FOLDER = ".greppy";
+  private readonly IGNORED_FINDINGS_FILE = "ignored.json";
+
+  // Store full ignored finding objects to support mapping
+  private ignoredFindingObjects: IgnoredFinding[] = [];
+
+  // In-memory cache of ignored findings by workspace folder
+  private ignoredFindingsByWorkspace: Map<string, IgnoredFinding[]> = new Map();
 
   constructor(private context?: vscode.ExtensionContext) {
     // Listen for active editor changes to apply decorations
@@ -43,14 +54,25 @@ export class DecoratorService {
     });
 
     // Register command to ignore a finding
-    vscode.commands.registerCommand(
-      "greppy.ignoreFinding",
-      (findingId: string) => {
-        this.ignoreFinding(findingId);
-      }
-    );
+    if (context) {
+      context.subscriptions.push(
+        vscode.commands.registerCommand(
+          "greppy.ignoreFinding",
+          (findingId: string) => {
+            this.ignoreFinding(findingId);
+          }
+        )
+      );
 
-    // Load ignored findings from storage if context is provided
+      // Register command to manage ignored findings
+      context.subscriptions.push(
+        vscode.commands.registerCommand("greppy.manageIgnoredFindings", () => {
+          this.showIgnoredFindingsManager();
+        })
+      );
+    }
+
+    // Load ignored findings for each workspace folder
     this.loadIgnoredFindings();
   }
 
@@ -58,40 +80,253 @@ export class DecoratorService {
    * Load ignored findings from storage
    */
   private loadIgnoredFindings(): void {
-    if (this.context) {
-      try {
-        const ignoredFindingsJson = this.context.globalState.get<string[]>(
-          this.IGNORED_FINDINGS_KEY,
-          []
+    try {
+      // Clear existing collections
+      this.ignoredFindings.clear();
+      this.ignoredFindingObjects = [];
+      this.ignoredFindingsByWorkspace.clear();
+
+      // Process each workspace folder
+      const workspaceFolders = vscode.workspace.workspaceFolders || [];
+      for (const workspaceFolder of workspaceFolders) {
+        // Get the storage path for this workspace
+        const ignoredFindingsPath = this.getIgnoredFindingsPath(
+          workspaceFolder.uri.fsPath
         );
 
-        this.ignoredFindings = new Set(ignoredFindingsJson);
-        console.log(
-          `Loaded ${this.ignoredFindings.size} ignored findings from storage`
-        );
-      } catch (error) {
-        console.error("Error loading ignored findings:", error);
+        // Load if it exists
+        if (fs.existsSync(ignoredFindingsPath)) {
+          try {
+            const ignoredFindingsData = fs.readFileSync(
+              ignoredFindingsPath,
+              "utf8"
+            );
+
+            const ignoredFindings = JSON.parse(
+              ignoredFindingsData
+            ) as IgnoredFinding[];
+
+            // Store the ignored findings for this workspace
+            this.ignoredFindingsByWorkspace.set(
+              workspaceFolder.uri.fsPath,
+              ignoredFindings
+            );
+
+            // Add to the global collections
+            for (const ignoredFinding of ignoredFindings) {
+              this.ignoredFindings.add(ignoredFinding.id);
+              this.ignoredFindingObjects.push(ignoredFinding);
+            }
+          } catch (err) {
+            console.error(`Error parsing ignored findings: ${err}`);
+          }
+        }
       }
+    } catch (error) {
+      console.error("Error loading ignored findings:", error);
     }
   }
 
   /**
    * Save ignored findings to storage
    */
-  private saveIgnoredFindings(): void {
-    if (this.context) {
-      try {
-        const ignoredFindingsArray = Array.from(this.ignoredFindings);
-        this.context.globalState.update(
-          this.IGNORED_FINDINGS_KEY,
-          ignoredFindingsArray
-        );
-        console.log(
-          `Saved ${ignoredFindingsArray.length} ignored findings to storage`
-        );
-      } catch (error) {
-        console.error("Error saving ignored findings:", error);
+  private saveIgnoredFindings(filePath?: string): void {
+    try {
+      // Get the workspace folder for this file
+      const workspaceFolder = this.getWorkspaceFolderForFile(filePath);
+      if (!workspaceFolder) {
+        console.error("No workspace folder found for file:", filePath);
+        return;
       }
+
+      // Get the ignored findings for this workspace
+      const ignoredFindingsPath = this.getIgnoredFindingsPath(
+        workspaceFolder.uri.fsPath
+      );
+
+      // Get or create the ignored findings for this workspace
+      let workspaceIgnored = this.ignoredFindingsByWorkspace.get(
+        workspaceFolder.uri.fsPath
+      );
+      if (!workspaceIgnored) {
+        workspaceIgnored = [];
+        this.ignoredFindingsByWorkspace.set(
+          workspaceFolder.uri.fsPath,
+          workspaceIgnored
+        );
+      }
+
+      // Create the storage directory if it doesn't exist
+      const storageDir = path.dirname(ignoredFindingsPath);
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+      }
+
+      // Save the ignored findings for this workspace
+      fs.writeFileSync(
+        ignoredFindingsPath,
+        JSON.stringify(workspaceIgnored, null, 2)
+      );
+
+      console.log(
+        `Saved ${workspaceIgnored.length} ignored findings for workspace ${workspaceFolder.name}`
+      );
+    } catch (error) {
+      console.error("Error saving ignored findings:", error);
+      vscode.window.showErrorMessage(
+        `Failed to save ignored findings: ${error}`
+      );
+    }
+  }
+
+  /**
+   * Get the path to the ignored findings file for a workspace
+   */
+  private getIgnoredFindingsPath(workspacePath: string): string {
+    return path.join(
+      workspacePath,
+      this.STORAGE_FOLDER,
+      this.IGNORED_FINDINGS_FILE
+    );
+  }
+
+  /**
+   * Get the workspace folder containing a file
+   */
+  private getWorkspaceFolderForFile(
+    filePath?: string
+  ): vscode.WorkspaceFolder | undefined {
+    if (!filePath) {
+      // If no file path is provided, use the active editor
+      const activeEditor = vscode.window.activeTextEditor;
+      if (!activeEditor) {
+        return vscode.workspace.workspaceFolders?.[0]; // Default to first workspace
+      }
+      filePath = activeEditor.document.uri.fsPath;
+    }
+
+    // Find the workspace folder containing this file
+    return vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+  }
+
+  /**
+   * Add to the ignored findings for a workspace
+   */
+  private addToWorkspaceIgnored(
+    finding: FindingResult,
+    filePath: string
+  ): void {
+    const workspaceFolder = this.getWorkspaceFolderForFile(filePath);
+    if (!workspaceFolder) {
+      return;
+    }
+
+    // Create an ignored finding object to store
+    const ignoredFinding: IgnoredFinding = {
+      id: finding.id,
+      persistentId:
+        finding.persistentId || IdService.generatePersistentId(finding),
+      patternName: finding.patternName,
+      filePath: finding.filePath,
+      lineNumber: finding.lineNumber,
+      matchedContent: finding.matchedContent,
+      timestamp: Date.now(),
+    };
+
+    // Get or create the array for this workspace
+    let workspaceIgnored = this.ignoredFindingsByWorkspace.get(
+      workspaceFolder.uri.fsPath
+    );
+    if (!workspaceIgnored) {
+      workspaceIgnored = [];
+      this.ignoredFindingsByWorkspace.set(
+        workspaceFolder.uri.fsPath,
+        workspaceIgnored
+      );
+    }
+
+    // Add the finding to this workspace's ignored array
+    workspaceIgnored.push(ignoredFinding);
+
+    // Also add to the global collections for quick access
+    this.ignoredFindings.add(finding.id);
+    this.ignoredFindingObjects.push(ignoredFinding);
+  }
+
+  /**
+   * Show a UI to manage ignored findings
+   */
+  private async showIgnoredFindingsManager(): Promise<void> {
+    // Get the current workspace folder
+    const workspaceFolder = this.getWorkspaceFolderForFile();
+    if (!workspaceFolder) {
+      vscode.window.showInformationMessage("No workspace folder found.");
+      return;
+    }
+
+    // Get the ignored findings for this workspace
+    const workspaceIgnored = this.ignoredFindingsByWorkspace.get(
+      workspaceFolder.uri.fsPath
+    );
+    if (!workspaceIgnored || workspaceIgnored.length === 0) {
+      vscode.window.showInformationMessage(
+        "No ignored findings in this workspace."
+      );
+      return;
+    }
+
+    // Create an array of quick pick items
+    const items = workspaceIgnored.map((ignoredFinding) => {
+      // Try to find additional information about this finding
+      let label = `${ignoredFinding.patternName} in ${path.basename(
+        ignoredFinding.filePath
+      )}:${ignoredFinding.lineNumber}`;
+      let description = ignoredFinding.matchedContent;
+
+      return {
+        label,
+        description,
+        detail: "Click to remove from ignored list",
+        id: ignoredFinding.id,
+        persistentId: ignoredFinding.persistentId,
+      };
+    });
+
+    // Show the quick pick menu
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: "Select an ignored finding to remove from ignored list",
+      canPickMany: true,
+    });
+
+    // If user made selections, remove them from ignored
+    if (selected && selected.length > 0) {
+      // Remove each selected finding
+      for (const item of selected) {
+        // Remove from workspace array
+        const index = workspaceIgnored.findIndex((f) => f.id === item.id);
+        if (index !== -1) {
+          workspaceIgnored.splice(index, 1);
+        }
+
+        // Remove from global set and array
+        this.ignoredFindings.delete(item.id);
+        const objIndex = this.ignoredFindingObjects.findIndex(
+          (f) => f.id === item.id
+        );
+        if (objIndex !== -1) {
+          this.ignoredFindingObjects.splice(objIndex, 1);
+        }
+      }
+
+      // Save changes
+      this.saveIgnoredFindings(workspaceFolder.uri.fsPath);
+
+      // Update decorations
+      this.updateDecorationsAfterIgnore();
+
+      vscode.window.showInformationMessage(
+        `Removed ${selected.length} item(s) from ignored findings.`
+      );
     }
   }
 
@@ -100,17 +335,39 @@ export class DecoratorService {
    *
    * @param findings The findings from the security analysis
    */
-  updateFindings(findings: FindingResult[]): void {
+  async updateFindings(findings: FindingResult[]): Promise<void> {
     // Clear old findings and decorations
     this.clearAllDecorations();
     this.findingsByFilePath.clear();
 
-    // Group findings by file path (filtering out ignored findings)
+    // Enhance findings with context and persistent IDs
+    const enhancedFindings: FindingResult[] = [];
     for (const finding of findings) {
+      // Skip existing ignored findings by ID
       if (this.ignoredFindings.has(finding.id)) {
-        continue; // Skip ignored findings
+        continue;
       }
 
+      // Enhance the finding with context and persistent ID
+      const enhancedFinding = await IdService.enhanceFinding(finding);
+
+      // Check if this finding matches any ignored findings by persistent ID or similarity
+      const matchingIgnoredId = IdService.findMatchingIgnoredFinding(
+        enhancedFinding,
+        this.ignoredFindingObjects
+      );
+
+      if (matchingIgnoredId) {
+        // This is effectively an ignored finding
+        this.ignoredFindings.add(enhancedFinding.id);
+        continue;
+      }
+
+      enhancedFindings.push(enhancedFinding);
+    }
+
+    // Group findings by file path (filtered out ignored findings)
+    for (const finding of enhancedFindings) {
       const filePath = finding.filePath;
       if (!this.findingsByFilePath.has(filePath)) {
         this.findingsByFilePath.set(filePath, []);
@@ -132,8 +389,36 @@ export class DecoratorService {
    * @param findings The findings to filter
    * @returns Filtered findings without ignored ones
    */
-  public getFilteredFindings(findings: FindingResult[]): FindingResult[] {
-    return findings.filter((finding) => !this.ignoredFindings.has(finding.id));
+  public async getFilteredFindings(
+    findings: FindingResult[]
+  ): Promise<FindingResult[]> {
+    const enhancedFindings: FindingResult[] = [];
+
+    for (const finding of findings) {
+      // Skip if already in the ignored set by ID
+      if (this.ignoredFindings.has(finding.id)) {
+        continue;
+      }
+
+      // Enhance the finding with context and persistent ID
+      const enhancedFinding = await IdService.enhanceFinding(finding);
+
+      // Check if this finding matches any ignored findings by persistent ID or similarity
+      const matchingIgnoredId = IdService.findMatchingIgnoredFinding(
+        enhancedFinding,
+        this.ignoredFindingObjects
+      );
+
+      if (matchingIgnoredId) {
+        // This is effectively an ignored finding
+        this.ignoredFindings.add(enhancedFinding.id);
+        continue;
+      }
+
+      enhancedFindings.push(enhancedFinding);
+    }
+
+    return enhancedFindings;
   }
 
   /**
@@ -144,6 +429,74 @@ export class DecoratorService {
    */
   isIgnored(findingId: string): boolean {
     return this.ignoredFindings.has(findingId);
+  }
+
+  /**
+   * Ignore a finding by its ID
+   *
+   * @param findingId The ID of the finding to ignore
+   */
+  private async ignoreFinding(findingId: string): Promise<void> {
+    // Find the finding for this ID
+    let findingToIgnore: FindingResult | undefined;
+    let filePath = "";
+
+    for (const [path, findings] of this.findingsByFilePath.entries()) {
+      const finding = findings.find((f) => f.id === findingId);
+      if (finding) {
+        findingToIgnore = finding;
+        filePath = path;
+        break;
+      }
+    }
+
+    if (!findingToIgnore) {
+      console.error("Could not find finding to ignore with ID:", findingId);
+      return;
+    }
+
+    // Add to workspace-specific ignored set
+    this.addToWorkspaceIgnored(findingToIgnore, filePath);
+
+    // Save to storage
+    this.saveIgnoredFindings(filePath);
+
+    // Update all editors
+    this.updateDecorationsAfterIgnore();
+
+    vscode.window.showInformationMessage(
+      `Issue has been acknowledged and will be hidden.`
+    );
+  }
+
+  /**
+   * Update decorations after ignoring a finding
+   */
+  private updateDecorationsAfterIgnore(): void {
+    // For each file path with findings
+    for (const [filePath, findings] of this.findingsByFilePath.entries()) {
+      // Filter out ignored findings
+      const remainingFindings = findings.filter(
+        (f) => !this.ignoredFindings.has(f.id)
+      );
+
+      if (remainingFindings.length === 0) {
+        // Remove the file if no findings remain
+        this.findingsByFilePath.delete(filePath);
+      } else {
+        // Update the findings list
+        this.findingsByFilePath.set(filePath, remainingFindings);
+      }
+    }
+
+    // Refresh the active editor
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      this.applyDecorations(activeEditor);
+    }
+
+    // Fire an event to notify the tree view to update
+    vscode.commands.executeCommand("greppy.refreshResultsTree");
   }
 
   /**
@@ -341,56 +694,6 @@ export class DecoratorService {
     );
 
     return new vscode.Hover(hoverContent);
-  }
-
-  /**
-   * Ignore a finding by its ID
-   *
-   * @param findingId The ID of the finding to ignore
-   */
-  private ignoreFinding(findingId: string): void {
-    // Add to ignored set
-    this.ignoredFindings.add(findingId);
-
-    // Save to storage
-    this.saveIgnoredFindings();
-
-    // Update all editors
-    this.updateDecorationsAfterIgnore();
-
-    vscode.window.showInformationMessage(
-      `Issue has been acknowledged and will be hidden.`
-    );
-  }
-
-  /**
-   * Update decorations after ignoring a finding
-   */
-  private updateDecorationsAfterIgnore(): void {
-    // For each file path with findings
-    for (const [filePath, findings] of this.findingsByFilePath.entries()) {
-      // Filter out ignored findings
-      const remainingFindings = findings.filter(
-        (f) => !this.ignoredFindings.has(f.id)
-      );
-
-      if (remainingFindings.length === 0) {
-        // Remove the file if no findings remain
-        this.findingsByFilePath.delete(filePath);
-      } else {
-        // Update the findings list
-        this.findingsByFilePath.set(filePath, remainingFindings);
-      }
-    }
-
-    // Refresh the active editor
-    const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor) {
-      this.applyDecorations(activeEditor);
-    }
-
-    // Fire an event to notify the tree view to update
-    vscode.commands.executeCommand("greppy.refreshResultsTree");
   }
 
   /**

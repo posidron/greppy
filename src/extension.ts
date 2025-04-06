@@ -117,8 +117,8 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Update the tree view and decorations with the same set of results
             // The decorator service will filter out ignored findings internally
-            resultsProvider.update(results, patterns);
-            decoratorService.updateFindings(results);
+            await resultsProvider.update(results, patterns);
+            await decoratorService.updateFindings(results);
 
             // Show a summary notification
             vscode.window.showInformationMessage(
@@ -186,8 +186,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Register a command to clear code decorations
   const clearDecorationsCommand = vscode.commands.registerCommand(
     "greppy.clearDecorations",
-    () => {
-      decoratorService.updateFindings([]);
+    async () => {
+      await decoratorService.updateFindings([]);
       vscode.window.showInformationMessage("Greppy code indicators cleared");
     }
   );
@@ -195,8 +195,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Register a command to refresh the results tree view
   const refreshResultsTreeCommand = vscode.commands.registerCommand(
     "greppy.refreshResultsTree",
-    () => {
-      resultsProvider.refresh();
+    async () => {
+      await resultsProvider.refresh();
     }
   );
 
@@ -211,6 +211,22 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register a command to manage ignored findings
+  const manageIgnoredFindingsCommand = vscode.commands.registerCommand(
+    "greppy.manageIgnoredFindings",
+    () => {
+      vscode.commands.executeCommand("greppy.manageIgnoredFindings");
+    }
+  );
+
+  // Register a command to fix findings with Copilot
+  const fixWithCopilotCommand = vscode.commands.registerCommand(
+    "greppy.fixWithCopilot",
+    async () => {
+      // Implementation of the command
+    }
+  );
+
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
@@ -220,6 +236,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(clearDecorationsCommand);
   context.subscriptions.push(refreshResultsTreeCommand);
   context.subscriptions.push(addPatternToSetCommand);
+  context.subscriptions.push(manageIgnoredFindingsCommand);
+  context.subscriptions.push(fixWithCopilotCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(

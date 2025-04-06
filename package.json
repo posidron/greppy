@@ -139,6 +139,17 @@
         "title": "Greppy: Filter by Severity (Partial)",
         "category": "Greppy",
         "icon": "$(filter)"
+      },
+      {
+        "command": "greppy.fixWithCopilot",
+        "title": "Greppy: Fix with GitHub Copilot",
+        "category": "Greppy"
+      },
+      {
+        "command": "greppy.manageIgnoredFindings",
+        "title": "Greppy: Manage Ignored Findings",
+        "category": "Greppy",
+        "icon": "$(eye-closed)"
       }
     ],
     "keybindings": [
@@ -208,6 +219,11 @@
           "command": "greppy.filterBySeverityPartial",
           "when": "view == greppyResults && greppy.showFilterPartial",
           "group": "navigation"
+        },
+        {
+          "command": "greppy.manageIgnoredFindings",
+          "when": "view == greppyResults",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -257,6 +273,13 @@
         },
         {
           "command": "greppy.filterBySeverityPartial"
+        },
+        {
+          "command": "greppy.fixWithCopilot",
+          "when": "false"
+        },
+        {
+          "command": "greppy.manageIgnoredFindings"
         }
       ]
     },
