@@ -431,9 +431,21 @@ export class DecoratorService {
       );
 
       editor.setDecorations(matchDecoration, [matchRange]);
-      this.decorationsByUri
-        .get(editor.document.uri.toString())!
-        .push(matchDecoration);
+
+      // Get the decoration collection for this editor
+      const decorationsForUri = this.decorationsByUri.get(
+        editor.document.uri.toString()
+      );
+
+      // Only push if the collection exists
+      if (decorationsForUri) {
+        decorationsForUri.push(matchDecoration);
+      } else {
+        // If no collection exists, create a new one with this decoration
+        this.decorationsByUri.set(editor.document.uri.toString(), [
+          matchDecoration,
+        ]);
+      }
     }
   }
 

@@ -237,27 +237,9 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function showWelcomeNotification() {
-  vscode.window
-    .showInformationMessage(
-      "Greppy security analysis extension is now active! Run security analysis on your code.",
-      "Run Analysis",
-      "Open Panel",
-      "Edit Patterns",
-      "Select Pattern Set"
-    )
-    .then((selection) => {
-      if (selection === "Run Analysis") {
-        vscode.commands.executeCommand("greppy.runAnalysis");
-      } else if (selection === "Open Panel") {
-        vscode.commands.executeCommand(
-          "workbench.view.extension.greppy-container"
-        );
-      } else if (selection === "Edit Patterns") {
-        vscode.commands.executeCommand("greppy.editPatterns");
-      } else if (selection === "Select Pattern Set") {
-        vscode.commands.executeCommand("greppy.selectPatternSet");
-      }
-    });
+  vscode.window.showInformationMessage(
+    "Greppy security analysis extension is now active! Use the shield icon in the activity bar to access security analysis features."
+  );
 }
 
 // This method is called when your extension is deactivated
