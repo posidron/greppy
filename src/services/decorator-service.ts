@@ -166,11 +166,11 @@ export class DecoratorService {
     const decorationTypes: vscode.TextEditorDecorationType[] = [];
 
     for (const finding of findings) {
-      // Create a decoration type with a colored square for the language indicator in gutter
+      // Create a decoration type with a severity icon in the gutter
       const gutterDecorationType = vscode.window.createTextEditorDecorationType(
         {
           isWholeLine: false,
-          gutterIconPath: this.createColorSquare(finding.codeIndicator),
+          gutterIconPath: this.createSeverityIcon(finding.severity),
           gutterIconSize: "auto",
         }
       );
@@ -218,7 +218,64 @@ export class DecoratorService {
   }
 
   /**
-   * Create a colored square for the gutter icon
+   * Create a severity icon for the gutter
+   *
+   * @param severity The severity level
+   * @returns URI of SVG image
+   */
+  private createSeverityIcon(
+    severity: "info" | "warning" | "critical"
+  ): vscode.Uri {
+    let icon = "";
+    const color = this.getSeverityColor(severity);
+
+    // Use same icons as the TreeView
+    switch (severity) {
+      case "info":
+        icon = "info";
+        break;
+      case "warning":
+        icon = "warning";
+        break;
+      case "critical":
+        icon = "error";
+        break;
+      default:
+        icon = "circle-outline";
+    }
+
+    // Create a SVG icon that matches VS Code ThemeIcon
+    const svg = `<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="${color}">
+      ${this.getIconPath(icon)}
+    </svg>`;
+
+    // Convert SVG to URI
+    return vscode.Uri.parse(
+      `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`
+    );
+  }
+
+  /**
+   * Get SVG path for a specific icon
+   *
+   * @param icon The icon name
+   * @returns SVG path string
+   */
+  private getIconPath(icon: string): string {
+    switch (icon) {
+      case "info":
+        return '<path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm-.5 4.77a.75.75 0 0 1 1.5 0v4.5a.75.75 0 0 1-1.5 0zm.75 7.98a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>';
+      case "warning":
+        return '<path d="M8.56 1h-1.12l-7 14h1.12l7-14Zm-1.12 0h1.12l7 14h-1.12l-7-14Z"/><path d="M8 4a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/>';
+      case "error":
+        return '<path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-8a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-3A.5.5 0 0 0 8 6zm0 5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1z"/>';
+      default:
+        return '<circle cx="8" cy="8" r="6" fill="none" stroke-width="1.5"/>';
+    }
+  }
+
+  /**
+   * Create a colored square for language indicators
    *
    * @param codeIndicator The language indicator
    * @returns URI of SVG image
