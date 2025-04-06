@@ -47,6 +47,12 @@
         "icon": "$(list-selection)"
       },
       {
+        "command": "greppy.addPatternToSet",
+        "title": "Greppy: Add Pattern to Set",
+        "category": "Greppy",
+        "icon": "$(add)"
+      },
+      {
         "command": "greppy.clearDecorations",
         "title": "Greppy: Clear Code Indicators",
         "category": "Greppy",
@@ -107,6 +113,11 @@
           "group": "navigation"
         },
         {
+          "command": "greppy.addPatternToSet",
+          "when": "view == greppyResults",
+          "group": "navigation"
+        },
+        {
           "command": "greppy.clearDecorations",
           "when": "view == greppyResults",
           "group": "navigation"
@@ -127,6 +138,9 @@
         },
         {
           "command": "greppy.selectPatternSet"
+        },
+        {
+          "command": "greppy.addPatternToSet"
         },
         {
           "command": "greppy.clearDecorations"
@@ -211,7 +225,7 @@
         "greppy.patternSets": {
           "type": "object",
           "default": {},
-          "description": "Predefined pattern sets for different technologies. These are merged with custom patterns.",
+          "description": "Custom pattern sets for different technologies. You can extend built-in pattern sets (general, cpp, web) by adding patterns with the same set name, or create entirely new sets.",
           "additionalProperties": {
             "type": "array",
             "items": {

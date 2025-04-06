@@ -83,6 +83,52 @@ Available fields:
 - `options`: (Optional) Array of command-line options to pass to the tool
 - `severity`: Severity level - "info", "warning", or "critical"
 
+### 🧩 Pattern Sets
+
+Greppy includes built-in pattern sets organized by technology:
+
+- `general`: Basic security patterns for all codebases
+- `cpp`: Security patterns for C and C++ development
+- `web`: Security patterns for web applications
+
+You can:
+
+1. **Select a pattern set** using the command palette: "Greppy: Select Pattern Set"
+2. **Add a pattern to a set** using the command palette: "Greppy: Add Pattern to Set" - this provides a guided UI for adding patterns
+3. **Extend existing pattern sets** by adding patterns to `greppy.patternSets` in settings:
+
+```json
+"greppy.patternSets": {
+  "cpp": [
+    {
+      "name": "My Custom C++ Pattern",
+      "description": "Checks for unsafe C++ code",
+      "tool": "ripgrep",
+      "pattern": "unsafeFunction\\(",
+      "severity": "critical"
+    }
+  ]
+}
+```
+
+This will add your pattern to the built-in C++ patterns rather than replacing them.
+
+3. **Create custom pattern sets** by adding new named sets:
+
+```json
+"greppy.patternSets": {
+  "my-framework": [
+    {
+      "name": "Framework-specific Issue",
+      "description": "Detects issues in my framework",
+      "tool": "ripgrep",
+      "pattern": "riskyFrameworkCall\\(",
+      "severity": "warning"
+    }
+  ]
+}
+```
+
 ## 📋 Example Patterns
 
 ### 🔎 Ripgrep Patterns

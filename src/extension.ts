@@ -201,6 +201,14 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register a command to add a pattern to a specific pattern set
+  const addPatternToSetCommand = vscode.commands.registerCommand(
+    "greppy.addPatternToSet",
+    async () => {
+      await PatternManager.addPatternToSet();
+    }
+  );
+
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
@@ -209,6 +217,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(selectPatternSetCommand);
   context.subscriptions.push(clearDecorationsCommand);
   context.subscriptions.push(refreshResultsTreeCommand);
+  context.subscriptions.push(addPatternToSetCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(
