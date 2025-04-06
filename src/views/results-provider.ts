@@ -21,10 +21,260 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private patterns: Map<string, PatternConfig> = new Map();
   private showWelcomeView: boolean = true;
 
+  // Severity filter settings
+  private showInfo: boolean = true;
+  private showWarning: boolean = true;
+  private showCritical: boolean = true;
+
   constructor(
     private context: vscode.ExtensionContext,
     private decoratorService: DecoratorService
-  ) {}
+  ) {
+    // Initialize filter settings from context
+    this.loadFilterSettings();
+
+    // Register commands for toggling severity filters
+    this.registerFilterCommands();
+  }
+
+  /**
+   * Load filter settings from extension storage
+   */
+  private loadFilterSettings(): void {
+    if (this.context) {
+      this.showInfo = this.context.globalState.get<boolean>(
+        "greppy.showInfo",
+        true
+      );
+      this.showWarning = this.context.globalState.get<boolean>(
+        "greppy.showWarning",
+        true
+      );
+      this.showCritical = this.context.globalState.get<boolean>(
+        "greppy.showCritical",
+        true
+      );
+
+      // Update checkboxes to match loaded settings
+      this.updateFilterCheckboxes();
+    }
+  }
+
+  /**
+   * Save filter settings to extension storage
+   */
+  private saveFilterSettings(): void {
+    if (this.context) {
+      this.context.globalState.update("greppy.showInfo", this.showInfo);
+      this.context.globalState.update("greppy.showWarning", this.showWarning);
+      this.context.globalState.update("greppy.showCritical", this.showCritical);
+    }
+  }
+
+  /**
+   * Register commands for toggling severity filters
+   */
+  private registerFilterCommands(): void {
+    // Register all the filter by severity commands to show the same dropdown
+    const showFilterDropdown = async () => {
+      // Get a checked/unchecked icon based on status
+      const getStatusIcon = (isActive: boolean) =>
+        isActive ? "$(check)" : "$(circle-large-outline)";
+
+      const items = [
+        {
+          label: `${getStatusIcon(this.showInfo)} $(info) Info`,
+          description: this.showInfo ? "Showing" : "Hidden",
+          picked: this.showInfo,
+          severity: "info" as const,
+          alwaysShow: true,
+        },
+        {
+          label: `${getStatusIcon(this.showWarning)} $(warning) Warning`,
+          description: this.showWarning ? "Showing" : "Hidden",
+          picked: this.showWarning,
+          severity: "warning" as const,
+          alwaysShow: true,
+        },
+        {
+          label: `${getStatusIcon(this.showCritical)} $(error) Critical`,
+          description: this.showCritical ? "Showing" : "Hidden",
+          picked: this.showCritical,
+          severity: "critical" as const,
+          alwaysShow: true,
+        },
+      ];
+
+      // Count active filters for the title
+      const activeCount = [
+        this.showInfo,
+        this.showWarning,
+        this.showCritical,
+      ].filter(Boolean).length;
+      const title = `Filter by Severity (${activeCount}/3 active)`;
+
+      const selected = await vscode.window.showQuickPick(items, {
+        title,
+        canPickMany: true,
+        placeHolder: "Select severity levels to display",
+      });
+
+      if (selected) {
+        // Update filter states based on selection
+        this.showInfo = selected.some((item) => item.severity === "info");
+        this.showWarning = selected.some((item) => item.severity === "warning");
+        this.showCritical = selected.some(
+          (item) => item.severity === "critical"
+        );
+
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      }
+    };
+
+    // Register all three filter commands to use the same dropdown
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "greppy.filterBySeverity",
+        showFilterDropdown
+      ),
+      vscode.commands.registerCommand(
+        "greppy.filterBySeverityAll",
+        showFilterDropdown
+      ),
+      vscode.commands.registerCommand(
+        "greppy.filterBySeverityPartial",
+        showFilterDropdown
+      )
+    );
+
+    // Toggle info severity visibility (both regular and "Off" versions)
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand("greppy.toggleInfoSeverity", () => {
+        this.showInfo = !this.showInfo;
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      }),
+      vscode.commands.registerCommand("greppy.toggleInfoSeverityOff", () => {
+        this.showInfo = !this.showInfo;
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      })
+    );
+
+    // Toggle warning severity visibility (both regular and "Off" versions)
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand("greppy.toggleWarningSeverity", () => {
+        this.showWarning = !this.showWarning;
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      }),
+      vscode.commands.registerCommand("greppy.toggleWarningSeverityOff", () => {
+        this.showWarning = !this.showWarning;
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      })
+    );
+
+    // Toggle critical severity visibility (both regular and "Off" versions)
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand("greppy.toggleCriticalSeverity", () => {
+        this.showCritical = !this.showCritical;
+        this.saveFilterSettings();
+        this.updateFilterCheckboxes();
+        this._onDidChangeTreeData.fire();
+      }),
+      vscode.commands.registerCommand(
+        "greppy.toggleCriticalSeverityOff",
+        () => {
+          this.showCritical = !this.showCritical;
+          this.saveFilterSettings();
+          this.updateFilterCheckboxes();
+          this._onDidChangeTreeData.fire();
+        }
+      )
+    );
+  }
+
+  /**
+   * Update the checkbox states for filter commands
+   */
+  private updateFilterCheckboxes(): void {
+    // Count enabled filters
+    const enabledCount = [
+      this.showInfo,
+      this.showWarning,
+      this.showCritical,
+    ].filter(Boolean).length;
+    const totalFilters = 3;
+
+    // Set filter display state
+    const showAll = enabledCount === totalFilters;
+    const showPartial = enabledCount > 0 && enabledCount < totalFilters;
+    const showDefault = enabledCount === 0;
+
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showFilterAll",
+      showAll
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showFilterPartial",
+      showPartial
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showFilterDefault",
+      showDefault
+    );
+
+    // Also update individual severity states (for backward compatibility)
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showInfo",
+      this.showInfo
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showWarning",
+      this.showWarning
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "greppy.showCritical",
+      this.showCritical
+    );
+  }
+
+  /**
+   * Get filtered results based on current severity filters
+   */
+  private getFilteredResults(): FindingResult[] {
+    // First filter out ignored findings using decoratorService
+    const nonIgnoredResults = this.decoratorService.getFilteredFindings(
+      this.results
+    );
+
+    // Then apply severity filters
+    return nonIgnoredResults.filter((finding) => {
+      switch (finding.severity) {
+        case "info":
+          return this.showInfo;
+        case "warning":
+          return this.showWarning;
+        case "critical":
+          return this.showCritical;
+        default:
+          return true;
+      }
+    });
+  }
 
   /**
    * Update the results shown in the TreeView.
@@ -33,12 +283,14 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @param patterns The patterns used for the results
    */
   update(results: FindingResult[], patterns: PatternConfig[]): void {
-    // Filter out any ignored findings using the decorator service
-    const filteredResults = this.decoratorService.getFilteredFindings(results);
-
-    this.results = filteredResults;
+    // Store the full results set
+    this.results = results;
     this.patterns = new Map(patterns.map((pattern) => [pattern.name, pattern]));
+
+    // Determine if we should show the welcome view based on filtered results
+    const filteredResults = this.getFilteredResults();
     this.showWelcomeView = filteredResults.length === 0;
+
     this._onDidChangeTreeData.fire();
   }
 
@@ -49,10 +301,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   refresh(): void {
     // Re-filter the existing results to account for newly ignored findings
     if (this.results.length > 0) {
-      const filteredResults = this.decoratorService.getFilteredFindings(
-        this.results
-      );
-      this.results = filteredResults;
+      const filteredResults = this.getFilteredResults();
       this.showWelcomeView = filteredResults.length === 0;
     }
 
@@ -81,7 +330,8 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       return Promise.resolve(this.getWelcomeViewItems());
     }
 
-    if (this.results.length === 0) {
+    const filteredResults = this.getFilteredResults();
+    if (filteredResults.length === 0) {
       return Promise.resolve([
         {
           label: "No results found",
@@ -92,7 +342,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
 
     if (!element) {
       // Root - show patterns with findings
-      const patternGroups = this.groupResultsByPattern();
+      const patternGroups = this.groupResultsByPattern(filteredResults);
       return Promise.resolve(this.createPatternTreeItems(patternGroups));
     } else if ("pattern" in element) {
       // Pattern - show findings for this pattern
@@ -101,6 +351,29 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
     }
 
     return Promise.resolve([]);
+  }
+
+  /**
+   * Group results by pattern.
+   *
+   * @returns Map of pattern name to findings
+   */
+  private groupResultsByPattern(
+    results: FindingResult[]
+  ): Map<string, FindingResult[]> {
+    const patternGroups = new Map<string, FindingResult[]>();
+
+    for (const result of results) {
+      const patternName = result.patternName;
+
+      if (!patternGroups.has(patternName)) {
+        patternGroups.set(patternName, []);
+      }
+
+      patternGroups.get(patternName)!.push(result);
+    }
+
+    return patternGroups;
   }
 
   /**
@@ -157,27 +430,6 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
         contextValue: "greppyAction",
       },
     ];
-  }
-
-  /**
-   * Group results by pattern.
-   *
-   * @returns Map of pattern name to findings
-   */
-  private groupResultsByPattern(): Map<string, FindingResult[]> {
-    const patternGroups = new Map<string, FindingResult[]>();
-
-    for (const result of this.results) {
-      const patternName = result.patternName;
-
-      if (!patternGroups.has(patternName)) {
-        patternGroups.set(patternName, []);
-      }
-
-      patternGroups.get(patternName)!.push(result);
-    }
-
-    return patternGroups;
   }
 
   /**

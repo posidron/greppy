@@ -196,10 +196,12 @@ export function activate(context: vscode.ExtensionContext) {
   const refreshResultsTreeCommand = vscode.commands.registerCommand(
     "greppy.refreshResultsTree",
     () => {
-      // Cause the tree view to refresh
       resultsProvider.refresh();
     }
   );
+
+  // Set initial filter states
+  updateFilterCheckboxes(true, true, true);
 
   // Register a command to add a pattern to a specific pattern set
   const addPatternToSetCommand = vscode.commands.registerCommand(
@@ -260,3 +262,48 @@ function showWelcomeNotification() {
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
+
+/**
+ * Updates the filter context variables for showing the appropriate filter button
+ */
+function updateFilterCheckboxes(
+  showInfo: boolean,
+  showWarning: boolean,
+  showCritical: boolean
+): void {
+  // Count enabled filters
+  const enabledCount = [showInfo, showWarning, showCritical].filter(
+    Boolean
+  ).length;
+  const totalFilters = 3;
+
+  // Set filter display state
+  const showAll = enabledCount === totalFilters;
+  const showPartial = enabledCount > 0 && enabledCount < totalFilters;
+  const showDefault = enabledCount === 0;
+
+  vscode.commands.executeCommand("setContext", "greppy.showFilterAll", showAll);
+  vscode.commands.executeCommand(
+    "setContext",
+    "greppy.showFilterPartial",
+    showPartial
+  );
+  vscode.commands.executeCommand(
+    "setContext",
+    "greppy.showFilterDefault",
+    showDefault
+  );
+
+  // Also update individual severity states for backward compatibility
+  vscode.commands.executeCommand("setContext", "greppy.showInfo", showInfo);
+  vscode.commands.executeCommand(
+    "setContext",
+    "greppy.showWarning",
+    showWarning
+  );
+  vscode.commands.executeCommand(
+    "setContext",
+    "greppy.showCritical",
+    showCritical
+  );
+}

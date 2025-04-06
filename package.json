@@ -54,19 +54,91 @@
       },
       {
         "command": "greppy.clearDecorations",
-        "title": "Greppy: Clear Code Indicators",
+        "title": "Greppy: Clear Decorations",
         "category": "Greppy",
         "icon": "$(clear-all)"
       },
       {
         "command": "greppy.ignoreFinding",
-        "title": "Greppy: Ignore Finding",
+        "title": "Ignore Finding",
         "category": "Greppy"
       },
       {
         "command": "greppy.refreshResultsTree",
-        "title": "Greppy: Refresh Results Tree",
+        "title": "Refresh Results Tree",
         "category": "Greppy"
+      },
+      {
+        "command": "greppy.toggleInfoSeverity",
+        "title": "Toggle Info Severity Visibility",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(info)",
+          "dark": "$(info)"
+        }
+      },
+      {
+        "command": "greppy.toggleWarningSeverity",
+        "title": "Toggle Warning Severity Visibility",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(warning)",
+          "dark": "$(warning)"
+        }
+      },
+      {
+        "command": "greppy.toggleCriticalSeverity",
+        "title": "Toggle Critical Severity Visibility",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(error)",
+          "dark": "$(error)"
+        }
+      },
+      {
+        "command": "greppy.toggleInfoSeverityOff",
+        "title": "Toggle Info Severity Visibility (Off)",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(info-unverified)",
+          "dark": "$(info-unverified)"
+        }
+      },
+      {
+        "command": "greppy.toggleWarningSeverityOff",
+        "title": "Toggle Warning Severity Visibility (Off)",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(warning-unverified)",
+          "dark": "$(warning-unverified)"
+        }
+      },
+      {
+        "command": "greppy.toggleCriticalSeverityOff",
+        "title": "Toggle Critical Severity Visibility (Off)",
+        "category": "Greppy",
+        "icon": {
+          "light": "$(error-unverified)",
+          "dark": "$(error-unverified)"
+        }
+      },
+      {
+        "command": "greppy.filterBySeverity",
+        "title": "Greppy: Filter by Severity",
+        "category": "Greppy",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "greppy.filterBySeverityAll",
+        "title": "Greppy: Filter by Severity (All)",
+        "category": "Greppy",
+        "icon": "$(filter-filled)"
+      },
+      {
+        "command": "greppy.filterBySeverityPartial",
+        "title": "Greppy: Filter by Severity (Partial)",
+        "category": "Greppy",
+        "icon": "$(filter)"
       }
     ],
     "keybindings": [
@@ -121,6 +193,21 @@
           "command": "greppy.clearDecorations",
           "when": "view == greppyResults",
           "group": "navigation"
+        },
+        {
+          "command": "greppy.filterBySeverity",
+          "when": "view == greppyResults && greppy.showFilterDefault",
+          "group": "navigation"
+        },
+        {
+          "command": "greppy.filterBySeverityAll",
+          "when": "view == greppyResults && greppy.showFilterAll",
+          "group": "navigation"
+        },
+        {
+          "command": "greppy.filterBySeverityPartial",
+          "when": "view == greppyResults && greppy.showFilterPartial",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -146,12 +233,30 @@
           "command": "greppy.clearDecorations"
         },
         {
+          "command": "greppy.toggleInfoSeverity"
+        },
+        {
+          "command": "greppy.toggleWarningSeverity"
+        },
+        {
+          "command": "greppy.toggleCriticalSeverity"
+        },
+        {
           "command": "greppy.ignoreFinding",
           "when": "false"
         },
         {
           "command": "greppy.refreshResultsTree",
           "when": "false"
+        },
+        {
+          "command": "greppy.filterBySeverity"
+        },
+        {
+          "command": "greppy.filterBySeverityAll"
+        },
+        {
+          "command": "greppy.filterBySeverityPartial"
         }
       ]
     },
