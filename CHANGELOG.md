@@ -1,7 +1,5 @@
 # Change Log
 
-All notable changes to the "greppy" extension will be documented in this file.
-
-## [Unreleased]
+## [v0.0.1]
 
 - Initial release
