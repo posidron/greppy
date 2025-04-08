@@ -385,11 +385,6 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   private getWelcomeViewItems(): TreeItem[] {
     return [
       {
-        label: "Welcome to Greppy",
-        collapsibleState: vscode.TreeItemCollapsibleState.None,
-        iconPath: new vscode.ThemeIcon("shield"),
-      },
-      {
         label: "Run Security Analysis",
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         iconPath: new vscode.ThemeIcon("play"),
