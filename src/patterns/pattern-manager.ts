@@ -4,13 +4,29 @@ import { CPP_PATTERNS } from "./cpp-patterns";
 import { GENERAL_PATTERNS } from "./general-patterns";
 import { WEB_PATTERNS } from "./web-patterns";
 
-/**
- * File extension associations for different pattern sets
- */
-const FILE_TYPE_ASSOCIATIONS = {
-  cpp: ["c", "cpp", "h", "hpp", "cc", "cxx", "c++", "hxx", "h++"],
+// Define common file type sets that a user might want to use
+// These are for convenience when adding custom patterns via UI
+export const COMMON_FILE_TYPES = {
+  general: ["*"], // For patterns that apply to all file types
+  cpp: [
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "cc",
+    "cxx",
+    "c++",
+    "hxx",
+    "h++",
+    "ixx", // C++20 modules interface
+    "cppm", // C++20 modules implementation
+    "cu", // CUDA files
+    "inl", // Inline implementation files
+    "tpp", // Template implementation files
+    "txx", // Template implementation files (alternative extension)
+    "mxx", // Module implementation files
+  ],
   web: ["js", "ts", "jsx", "tsx", "html", "css", "php", "vue", "svelte"],
-  general: ["*"], // General patterns apply to all files by default
 };
 
 /**
@@ -96,18 +112,9 @@ export class PatternManager {
         break;
     }
 
-    // Apply file type associations to patterns
-    return patterns.map((pattern) => {
-      if (!pattern.supportedFileTypes) {
-        // If no specific file types defined, use the set's default associations
-        const associations =
-          FILE_TYPE_ASSOCIATIONS[
-            setName as keyof typeof FILE_TYPE_ASSOCIATIONS
-          ] || FILE_TYPE_ASSOCIATIONS.general;
-        return { ...pattern, supportedFileTypes: associations };
-      }
-      return pattern;
-    });
+    // Each pattern should already have supportedFileTypes from its definition
+    // No need to apply file type associations here
+    return patterns;
   }
 
   /**
@@ -120,21 +127,25 @@ export class PatternManager {
     pattern: PatternConfig,
     fileExtension: string
   ): boolean {
-    // If pattern has no specific file type limitations, it applies to all files
-    if (
-      !pattern.supportedFileTypes ||
-      pattern.supportedFileTypes.length === 0
-    ) {
-      return true;
+    // If the pattern has explicitly defined supportedFileTypes, respect that completely
+    if (pattern.supportedFileTypes && pattern.supportedFileTypes.length > 0) {
+      // Wildcard means the pattern applies to all file types
+      if (pattern.supportedFileTypes.includes("*")) {
+        return true;
+      }
+
+      // Otherwise, only apply if the file extension is in the supportedFileTypes list
+      return pattern.supportedFileTypes.includes(fileExtension);
     }
 
-    // If the pattern supports all files (wildcard)
-    if (pattern.supportedFileTypes.includes("*")) {
-      return true;
+    // Special case: Weggli only works with C/C++ files (hard requirement)
+    if (pattern.tool === "weggli") {
+      return COMMON_FILE_TYPES.cpp.includes(fileExtension);
     }
 
-    // Check if the file extension is in the supported list
-    return pattern.supportedFileTypes.includes(fileExtension.toLowerCase());
+    // For patterns without explicit supportedFileTypes, default to including them
+    // This preserves backward compatibility with older patterns
+    return true;
   }
 
   /**
@@ -143,75 +154,20 @@ export class PatternManager {
    * @returns Array of patterns applicable to the file
    */
   public static getPatternsForFile(filePath: string): PatternConfig[] {
+    // Get the file extension
     const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";
+
+    // Get all available patterns from the active pattern set
     const allPatterns = PatternManager.getPatterns();
 
-    console.log(
-      `PatternManager: Getting patterns for file with extension "${fileExtension}", found ${allPatterns.length} total patterns`
+    // Filter patterns to only those applicable to this file type
+    const applicablePatterns = allPatterns.filter((pattern) =>
+      PatternManager.isPatternSupportedForFileType(pattern, fileExtension)
     );
 
-    // Start with all patterns
-    let applicablePatterns = [...allPatterns];
-
-    // Filter out weggli patterns for non-C/C++ files (this is a hard requirement)
-    if (!FILE_TYPE_ASSOCIATIONS.cpp.includes(fileExtension)) {
-      const beforeCount = applicablePatterns.length;
-      applicablePatterns = applicablePatterns.filter(
-        (p) => p.tool !== "weggli"
-      );
-      console.log(
-        `PatternManager: Filtered out ${
-          beforeCount - applicablePatterns.length
-        } weggli patterns not compatible with .${fileExtension} files`
-      );
-    }
-
-    // Apply supportedFileTypes filtering only if explicitly defined
-    // This ensures older patterns without this property still work
-    const beforeCount = applicablePatterns.length;
-    applicablePatterns = applicablePatterns.filter((pattern) => {
-      // If pattern has no supportedFileTypes, it applies to all files
-      if (
-        !pattern.supportedFileTypes ||
-        pattern.supportedFileTypes.length === 0
-      ) {
-        return true;
-      }
-
-      // If the pattern supports all files (wildcard)
-      if (pattern.supportedFileTypes.includes("*")) {
-        return true;
-      }
-
-      // Check if the file extension is in the supported list
-      const isSupported = pattern.supportedFileTypes.includes(fileExtension);
-      return isSupported;
-    });
-
     console.log(
-      `PatternManager: After file type filtering, ${
-        applicablePatterns.length
-      } patterns remain (filtered out ${
-        beforeCount - applicablePatterns.length
-      } patterns)`
+      `PatternManager: Found ${applicablePatterns.length} patterns applicable to "${filePath}" out of ${allPatterns.length} total patterns`
     );
-
-    // Ensure we're not returning an empty array unexpectedly
-    if (applicablePatterns.length === 0 && allPatterns.length > 0) {
-      console.warn(
-        `PatternManager: No applicable patterns found for .${fileExtension} file. Using general patterns as fallback.`
-      );
-      // Fallback to general patterns (excluding weggli for non-C/C++ files)
-      return allPatterns.filter((p) => {
-        if (
-          p.tool === "weggli" &&
-          !FILE_TYPE_ASSOCIATIONS.cpp.includes(fileExtension)
-        ) {
-          return false;
-        }
-        return true;
-      });
-    }
 
     return applicablePatterns;
   }
@@ -447,9 +403,9 @@ export class PatternManager {
     if (selectedFileTypes.label === "*") {
       supportedFileTypes = ["*"];
     } else if (selectedFileTypes.label === "cpp") {
-      supportedFileTypes = FILE_TYPE_ASSOCIATIONS.cpp;
+      supportedFileTypes = COMMON_FILE_TYPES.cpp;
     } else if (selectedFileTypes.label === "web") {
-      supportedFileTypes = FILE_TYPE_ASSOCIATIONS.web;
+      supportedFileTypes = COMMON_FILE_TYPES.web;
     } else if (selectedFileTypes.label === "custom") {
       const customFileTypes = await vscode.window.showInputBox({
         title: "Custom File Types",

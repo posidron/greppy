@@ -17,21 +17,112 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize services
   const grepService = new GrepService(context);
   const decoratorService = new DecoratorService(context);
-
-  // Create the results provider
   const resultsProvider = new GrepResultsProvider(context, decoratorService);
 
-  // Register the tree data provider - but don't require it for auto-scan
+  // Register the tree data provider
   const treeView = vscode.window.createTreeView("greppyResults", {
     treeDataProvider: resultsProvider,
     showCollapseAll: true,
   });
   context.subscriptions.push(treeView);
 
-  // Don't wait for the sidebar initialization to start auto-scan
-  // Just mark the extension as ready immediately
-  let extensionReady = true;
-  console.log("Greppy extension fully initialized and ready for auto-scanning");
+  // Initialize the view with empty results
+  resultsProvider.update([], []);
+
+  // Ensure that all components are properly initialized before beginning auto-scan
+  let extensionReady = false;
+
+  // Mark extension as ready after activation
+  setTimeout(() => {
+    extensionReady = true;
+    console.log(
+      "Greppy extension fully initialized and ready for auto-scanning"
+    );
+
+    // Set up auto-scan functionality for open files
+    const autoScanEnabled = vscode.workspace
+      .getConfiguration("greppy")
+      .get<boolean>("enableAutoScan", true);
+
+    if (autoScanEnabled) {
+      console.log("Auto-scan enabled, setting up file watchers");
+
+      // Scan all open files immediately
+      vscode.workspace.textDocuments.forEach(scanSingleFile);
+      console.log("Initial auto-scan of open files completed");
+
+      // Set up watcher for newly opened files
+      const textDocOpenListener = vscode.workspace.onDidOpenTextDocument(
+        (document) => {
+          // Get the current auto-scan setting (it might have changed)
+          const isAutoScanEnabled = vscode.workspace
+            .getConfiguration("greppy")
+            .get<boolean>("enableAutoScan", true);
+
+          // Check if this is a file opening as a result of clicking a result
+          const isFromManualScan = resultsProvider.hasNonEmptyResults();
+
+          if (isAutoScanEnabled && !isFromManualScan) {
+            // Only auto-scan if this isn't from clicking a result in the results panel
+            scanSingleFile(document);
+          } else if (isFromManualScan) {
+            // If we're opening a file from results view, just apply decorations
+            // without rescanning or replacing the results
+            const results = resultsProvider.getResults();
+            decoratorService.updateFindings(results);
+            console.log("Applied existing findings to newly opened document");
+          }
+        }
+      );
+
+      // Set up watcher for active editor changes (switching between tabs)
+      const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(
+        (editor) => {
+          if (editor) {
+            // Get the current auto-scan setting
+            const isAutoScanEnabled = vscode.workspace
+              .getConfiguration("greppy")
+              .get<boolean>("enableAutoScan", true);
+
+            // Check if this is from a manual scan to avoid overriding results
+            const isFromManualScan = resultsProvider.hasNonEmptyResults();
+
+            if (isAutoScanEnabled && !isFromManualScan) {
+              // Only auto-scan if this isn't from clicking a result in the results panel
+              const document = editor.document;
+              console.log(`Editor changed to: ${document.fileName}`);
+              scanSingleFile(document);
+            } else if (isFromManualScan) {
+              // If we're navigating between files from results view, just apply decorations
+              // without rescanning or replacing the results
+              console.log(
+                "Editor changed but manual scan results exist - preserving results"
+              );
+              const results = resultsProvider.getResults();
+              decoratorService.updateFindings(results);
+            }
+          }
+        }
+      );
+
+      // Listen for changes to the auto-scan setting
+      const configListener = vscode.workspace.onDidChangeConfiguration(
+        (event) => {
+          if (event.affectsConfiguration("greppy.enableAutoScan")) {
+            const newAutoScanEnabled = vscode.workspace
+              .getConfiguration("greppy")
+              .get<boolean>("enableAutoScan", true);
+            console.log(`Auto-scan setting changed to: ${newAutoScanEnabled}`);
+          }
+        }
+      );
+
+      // Add listeners to subscriptions
+      context.subscriptions.push(textDocOpenListener);
+      context.subscriptions.push(activeEditorListener);
+      context.subscriptions.push(configListener);
+    }
+  }, 1000); // Small delay to ensure everything is ready
 
   // Function to determine appropriate patterns for a file based on its extension
   const getPatternsForFile = (filePath: string): any[] => {
@@ -159,28 +250,17 @@ export function activate(context: vscode.ExtensionContext) {
           `Applying ${fileResults.length} findings for ${document.fileName} to UI`
         );
 
-        try {
-          // Apply decorations first - this is the most critical part for autoscan
-          await decoratorService.updateFindings(fileResults);
-          console.log("Applied decorations to all editors");
+        // First update the results provider
+        await resultsProvider.update(fileResults, patternsToUse);
+        console.log(
+          "Updating results provider with",
+          fileResults.length,
+          "findings"
+        );
 
-          // Try to update the results provider if possible - but this isn't critical
-          try {
-            await resultsProvider.update(fileResults, patternsToUse);
-            console.log(
-              "Updating results provider with",
-              fileResults.length,
-              "findings"
-            );
-          } catch (resultsError) {
-            // This is fine - it just means the sidebar isn't open yet
-            console.log(
-              "Results provider not available - sidebar may not be open"
-            );
-          }
-        } catch (error) {
-          console.error("Error updating UI with findings:", error);
-        }
+        // Then apply decorations to all editors
+        await decoratorService.updateFindings(fileResults);
+        console.log("Applied decorations to all editors");
 
         // Show notification about findings (optional)
         console.log(
@@ -193,68 +273,6 @@ export function activate(context: vscode.ExtensionContext) {
       console.error(`Error during auto-scan of ${document.fileName}:`, error);
     }
   };
-
-  // Set up auto-scan functionality for open files
-  const autoScanEnabled = vscode.workspace
-    .getConfiguration("greppy")
-    .get<boolean>("enableAutoScan", true);
-
-  // If auto-scan is enabled, set it up immediately
-  if (autoScanEnabled) {
-    console.log("Auto-scan enabled, setting up file watchers");
-
-    // Scan all open files immediately
-    vscode.workspace.textDocuments.forEach(scanSingleFile);
-    console.log("Initial auto-scan of open files completed");
-
-    // Set up watcher for newly opened files
-    const textDocOpenListener = vscode.workspace.onDidOpenTextDocument(
-      (document) => {
-        // Get the current auto-scan setting (it might have changed)
-        const isAutoScanEnabled = vscode.workspace
-          .getConfiguration("greppy")
-          .get<boolean>("enableAutoScan", true);
-        if (isAutoScanEnabled) {
-          scanSingleFile(document);
-        }
-      }
-    );
-
-    // Set up watcher for active editor changes (switching between tabs)
-    const activeEditorListener = vscode.window.onDidChangeActiveTextEditor(
-      (editor) => {
-        if (editor) {
-          // Get the current auto-scan setting
-          const isAutoScanEnabled = vscode.workspace
-            .getConfiguration("greppy")
-            .get<boolean>("enableAutoScan", true);
-          if (isAutoScanEnabled) {
-            // Track which files we've scanned to avoid excessive rescanning
-            const document = editor.document;
-            console.log(`Editor changed to: ${document.fileName}`);
-            scanSingleFile(document);
-          }
-        }
-      }
-    );
-
-    // Listen for changes to the auto-scan setting
-    const configListener = vscode.workspace.onDidChangeConfiguration(
-      (event) => {
-        if (event.affectsConfiguration("greppy.enableAutoScan")) {
-          const newAutoScanEnabled = vscode.workspace
-            .getConfiguration("greppy")
-            .get<boolean>("enableAutoScan", true);
-          console.log(`Auto-scan setting changed to: ${newAutoScanEnabled}`);
-        }
-      }
-    );
-
-    // Add listeners to subscriptions
-    context.subscriptions.push(textDocOpenListener);
-    context.subscriptions.push(activeEditorListener);
-    context.subscriptions.push(configListener);
-  }
 
   // Function to scan all open files
   const scanAllOpenFiles = async () => {
@@ -466,20 +484,16 @@ export function activate(context: vscode.ExtensionContext) {
               `Analysis complete. Found ${results.length} results.`
             );
 
-            // Open the sidebar view and focus it
-            try {
-              // Try to show and focus the view
+            // Focus the tree view
+            if (treeView.visible) {
+              // Only try to reveal if the tree view is visible
+              // This will also focus the view
+              vscode.commands.executeCommand("greppyResults.focus");
+            } else {
+              // If the view isn't visible, show the Greppy view container
               vscode.commands.executeCommand(
                 "workbench.view.extension.greppy-container"
               );
-
-              // Only try to focus specifically if the treeView exists and is visible
-              if (treeView && treeView.visible) {
-                vscode.commands.executeCommand("greppyResults.focus");
-              }
-            } catch (error) {
-              console.error("Error showing results view:", error);
-              // Non-critical error, we've already shown the notification
             }
 
             return results;
@@ -610,13 +624,15 @@ export function deactivate() {}
  */
 function updateFilterCheckboxes(
   showInfo: boolean,
-  showWarning: boolean,
+  showWarning: boolean, // Controls both warning and medium severities
   showCritical: boolean
 ): void {
   // Count enabled filters
   const enabledCount = [showInfo, showWarning, showCritical].filter(
     Boolean
   ).length;
+  // We have 4 severity levels (info, warning, medium, critical)
+  // but only 3 toggles since medium shares the warning filter
   const totalFilters = 3;
 
   // Set filter display state

@@ -2,7 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 // Re-importing with a slightly different format to clear any potential caching issues
-import type { FindingResult, IgnoredFinding } from "../models/types";
+import type {
+  FindingResult,
+  IgnoredFinding,
+  PatternConfig,
+} from "../models/types";
 import { AIService } from "./ai-service";
 import { IdService } from "./id-service";
 
@@ -599,7 +603,7 @@ export class DecoratorService {
    * @returns URI of SVG image
    */
   private createSeverityIcon(
-    severity: "info" | "warning" | "critical"
+    severity: "info" | "warning" | "medium" | "critical"
   ): vscode.Uri {
     let icon = "";
     const color = this.getSeverityColor(severity);
@@ -610,6 +614,7 @@ export class DecoratorService {
         icon = "info";
         break;
       case "warning":
+      case "medium":
         icon = "warning";
         break;
       case "critical":
@@ -670,11 +675,78 @@ export class DecoratorService {
   }
 
   /**
-   * Provide hover information for findings
+   * Find the mitigation advice for a finding
    *
-   * @param document The document being hovered
-   * @param position The position in the document
-   * @returns Hover information if there's a finding at the position
+   * @param finding The finding to get mitigation for
+   * @returns The mitigation advice if available
+   */
+  private findMitigationForFinding(finding: FindingResult): string | undefined {
+    // Get all pattern sets to search through
+    const config = vscode.workspace.getConfiguration("greppy");
+    const patternSets = config.get<Record<string, PatternConfig[]>>(
+      "patternSets",
+      {}
+    );
+    const customPatterns = config.get<PatternConfig[]>("patterns", []);
+
+    // Log for debugging
+    console.log(`Finding mitigation for pattern: ${finding.patternName}`);
+
+    // Check in custom patterns first
+    const customMatch = customPatterns.find(
+      (p) => p.name === finding.patternName
+    );
+    if (customMatch?.mitigation) {
+      console.log(
+        `Found mitigation in custom patterns: ${customMatch.mitigation}`
+      );
+      return customMatch.mitigation;
+    }
+
+    // Check in pattern sets
+    for (const [setName, setPatterns] of Object.entries(patternSets)) {
+      const match = setPatterns.find((p) => p.name === finding.patternName);
+      if (match?.mitigation) {
+        console.log(
+          `Found mitigation in pattern set ${setName}: ${match.mitigation}`
+        );
+        return match.mitigation;
+      }
+    }
+
+    // Fall back to checking built-in pattern sets in code
+    // Import the pattern sets directly to ensure we have the latest definitions
+    const { DEFAULT_PATTERNS } = require("../default-config");
+    const { GENERAL_PATTERNS } = require("../patterns/general-patterns");
+    const { CPP_PATTERNS } = require("../patterns/cpp-patterns");
+    const { WEB_PATTERNS } = require("../patterns/web-patterns");
+
+    // Check each built-in pattern set
+    const builtInSets = [
+      DEFAULT_PATTERNS,
+      GENERAL_PATTERNS,
+      CPP_PATTERNS,
+      WEB_PATTERNS,
+    ];
+
+    for (const patternSet of builtInSets) {
+      const match = patternSet.find(
+        (p: PatternConfig) => p.name === finding.patternName
+      );
+      if (match?.mitigation) {
+        console.log(
+          `Found mitigation in built-in patterns: ${match.mitigation}`
+        );
+        return match.mitigation;
+      }
+    }
+
+    console.log(`No mitigation found for pattern: ${finding.patternName}`);
+    return undefined;
+  }
+
+  /**
+   * Provides hover information for findings
    */
   private async provideHoverForFinding(
     document: vscode.TextDocument,
@@ -736,6 +808,27 @@ export class DecoratorService {
       `**Matched Content**: \`${finding.matchedContent}\`\n\n`
     );
     hoverContent.appendMarkdown(`**Tool**: ${finding.tool}\n\n`);
+
+    // Find and display mitigation advice if available
+    const mitigation = this.findMitigationForFinding(finding);
+    if (mitigation) {
+      hoverContent.appendMarkdown(`**Mitigation**: ${mitigation}\n\n`);
+    } else {
+      // Provide a generic fallback mitigation suggestion based on the severity
+      let fallbackMitigation = "Review the code for potential security issues.";
+      if (finding.severity === "critical") {
+        fallbackMitigation =
+          "This is a critical security issue that should be addressed immediately.";
+      } else if (
+        finding.severity === "medium" ||
+        finding.severity === "warning"
+      ) {
+        fallbackMitigation =
+          "Review and address this potential security issue in your next development cycle.";
+      }
+
+      hoverContent.appendMarkdown(`**Mitigation**: ${fallbackMitigation}\n\n`);
+    }
 
     // Add the AI explanation only if enabled
     if (isAiAnalysisEnabled) {
@@ -890,12 +983,16 @@ export class DecoratorService {
    * @param severity The severity level
    * @returns A color string for the severity
    */
-  private getSeverityColor(severity: "info" | "warning" | "critical"): string {
+  private getSeverityColor(
+    severity: "info" | "warning" | "medium" | "critical"
+  ): string {
     switch (severity) {
       case "info":
         return "#2196F3"; // Blue for info
       case "warning":
         return "#FFC107"; // Yellow for warning
+      case "medium":
+        return "#FF9800"; // Orange for medium
       case "critical":
         return "#F44336"; // Red for critical
       default:
@@ -910,13 +1007,15 @@ export class DecoratorService {
    * @returns A background color string for the severity
    */
   private getSeverityBackgroundColor(
-    severity: "info" | "warning" | "critical"
+    severity: "info" | "warning" | "medium" | "critical"
   ): string {
     switch (severity) {
       case "info":
         return "rgba(33, 150, 243, 0.1)"; // Light blue for info
       case "warning":
         return "rgba(255, 193, 7, 0.1)"; // Light yellow for warning
+      case "medium":
+        return "rgba(255, 152, 0, 0.1)"; // Light orange for medium
       case "critical":
         return "rgba(244, 67, 54, 0.1)"; // Light red for critical
       default:

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import * as vscode from "vscode";
 import { DEFAULT_PATTERNS } from "../default-config";
 import { FindingResult, PatternConfig } from "../models/types";
+import { COMMON_FILE_TYPES, PatternManager } from "../patterns/pattern-manager";
 import { IdService } from "./id-service";
 
 // We'll use dynamic import for execa
@@ -130,15 +131,25 @@ export class GrepService {
       return [];
     }
 
+    console.log(
+      `GrepService: Running analysis on workspace ${workspaceFolder.uri.fsPath} with ${patterns.length} patterns`
+    );
+
     // Check for required tools
     const toolCheck = await this.checkRequiredTools(patterns);
 
     // Filter out patterns that require missing tools
     const filteredPatterns = patterns.filter((pattern) => {
       if (pattern.tool === "ripgrep" && !toolCheck.ripgrepAvailable) {
+        console.log(
+          `GrepService: Skipping pattern "${pattern.name}" - ripgrep not available`
+        );
         return false;
       }
       if (pattern.tool === "weggli" && !toolCheck.weggliAvailable) {
+        console.log(
+          `GrepService: Skipping pattern "${pattern.name}" - weggli not available`
+        );
         return false;
       }
       return true;
@@ -146,16 +157,62 @@ export class GrepService {
 
     // If all patterns were filtered out, return early
     if (filteredPatterns.length === 0) {
+      console.log("GrepService: No applicable patterns remain after filtering");
       return [];
     }
 
+    console.log(
+      `GrepService: Analysis will run with ${filteredPatterns.length} patterns`
+    );
     const allResults: FindingResult[] = [];
 
     for (const pattern of filteredPatterns) {
       try {
+        // Before running the pattern, create a file filter to only analyze supported file types
+        let fileTypeFilter = "";
+
+        // If pattern has specific supportedFileTypes, use those to filter files
+        if (
+          pattern.supportedFileTypes &&
+          pattern.supportedFileTypes.length > 0
+        ) {
+          // If wildcard is present, no filtering needed
+          if (pattern.supportedFileTypes.includes("*")) {
+            fileTypeFilter = "";
+          } else {
+            // Create glob patterns for each supported file type
+            const globArgs = [];
+            for (const ext of pattern.supportedFileTypes) {
+              globArgs.push("--glob", `*.${ext}`);
+            }
+            fileTypeFilter = globArgs.join(" ");
+
+            console.log(
+              `GrepService: Filtering pattern "${
+                pattern.name
+              }" to only scan files with extensions: ${pattern.supportedFileTypes.join(
+                ", "
+              )}`
+            );
+          }
+        } else if (pattern.tool === "weggli") {
+          // Special case: weggli only works with C/C++ files
+          const globArgs = [];
+          for (const ext of COMMON_FILE_TYPES.cpp) {
+            globArgs.push("--glob", `*.${ext}`);
+          }
+          fileTypeFilter = globArgs.join(" ");
+
+          console.log(
+            `GrepService: Filtering weggli pattern "${pattern.name}" to only C/C++ files`
+          );
+        }
+        // For patterns without supportedFileTypes, no filtering is applied
+
         const results = await this.executePattern(
           pattern,
-          workspaceFolder.uri.fsPath
+          workspaceFolder.uri.fsPath,
+          fileTypeFilter
         );
 
         // Enhance each finding with context and persistent ID
@@ -179,17 +236,23 @@ export class GrepService {
    *
    * @param pattern The pattern configuration
    * @param workspacePath The path to the workspace folder
+   * @param fileTypeFilter Optional filter to limit search to specific file types
    * @returns Promise with the search results
    */
   private async executePattern(
     pattern: PatternConfig,
-    workspacePath: string
+    workspacePath: string,
+    fileTypeFilter: string = ""
   ): Promise<FindingResult[]> {
     const results: FindingResult[] = [];
     const timestamp = Date.now();
 
     console.log(
-      `GrepService: Executing pattern "${pattern.name}" on workspace "${workspacePath}"`
+      `GrepService: Executing pattern "${
+        pattern.name
+      }" on workspace "${workspacePath}"${
+        fileTypeFilter ? " with filter " + fileTypeFilter : ""
+      }`
     );
 
     try {
@@ -202,15 +265,27 @@ export class GrepService {
           .get<string>("ripgrepPath", "rg");
 
         // Build command args
-        const args = [
+        let args = [
           "--line-number",
           "--no-heading",
           "--color",
           "never",
           ...(pattern.options || []),
-          pattern.pattern,
-          workspacePath,
         ];
+
+        // Add file type filter if specified
+        if (fileTypeFilter) {
+          // Parse the fileTypeFilter into individual args
+          const filterParts = fileTypeFilter.split(" ");
+          for (let i = 0; i < filterParts.length; i += 2) {
+            if (filterParts[i] && filterParts[i + 1]) {
+              args.push(filterParts[i], filterParts[i + 1]);
+            }
+          }
+        }
+
+        // Add the pattern and path
+        args = [...args, pattern.pattern, workspacePath];
 
         // Execute ripgrep
         const { stdout } = await execa(rgPath, args);
@@ -222,18 +297,68 @@ export class GrepService {
           .getConfiguration("greppy")
           .get<string>("weggliPath", "weggli");
 
-        // Build command args
-        const args = [
-          ...(pattern.options || []),
-          pattern.pattern,
-          workspacePath,
-        ];
+        // For weggli, we need to find C/C++ files to analyze
+        // Use ripgrep to find all C/C++ files in the workspace
+        const rgPath = vscode.workspace
+          .getConfiguration("greppy")
+          .get<string>("ripgrepPath", "rg");
 
-        // Execute weggli
-        const { stdout } = await execa(weggliPath, args);
+        // Build the glob pattern for C/C++ files using COMMON_FILE_TYPES.cpp
+        // This ensures we only run weggli on C/C++ files
+        const globPatterns = COMMON_FILE_TYPES.cpp.map(
+          (ext: string) => `--glob=*.${ext}`
+        );
 
-        // Parse the output
-        results.push(...this.parseWeggliOutput(stdout, pattern, timestamp));
+        let cppFiles = [];
+        try {
+          // Find all C/C++ files
+          const { stdout } = await execa(rgPath, [
+            "--files",
+            ...globPatterns,
+            workspacePath,
+          ]);
+
+          cppFiles = stdout.split("\n").filter((file) => file.trim() !== "");
+
+          if (cppFiles.length === 0) {
+            console.log(
+              `GrepService: No C/C++ files found in workspace, skipping weggli pattern "${pattern.name}"`
+            );
+            return [];
+          }
+
+          console.log(
+            `GrepService: Found ${cppFiles.length} C/C++ files for weggli pattern "${pattern.name}"`
+          );
+        } catch (error) {
+          console.error(`Error finding C/C++ files for weggli:`, error);
+          return [];
+        }
+
+        // Process each C/C++ file individually with weggli
+        for (const file of cppFiles) {
+          try {
+            const { stdout } = await execa(weggliPath, [
+              ...(pattern.options || []),
+              pattern.pattern,
+              file,
+            ]);
+
+            // Parse the output
+            if (stdout.trim()) {
+              results.push(
+                ...this.parseWeggliOutput(stdout, pattern, timestamp)
+              );
+            }
+          } catch (error: any) {
+            // Handle expected errors like "no matches found"
+            if (error.exitCode === 1 && error.stderr === "") {
+              // No matches found is not an error for weggli
+              continue;
+            }
+            console.error(`Error running weggli on ${file}:`, error);
+          }
+        }
       }
     } catch (error: any) {
       // Handle expected errors like "no matches found"
@@ -281,47 +406,18 @@ export class GrepService {
     const results: FindingResult[] = [];
     const timestamp = Date.now();
 
-    // Get file extension
+    // Extract the file extension
     const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";
 
+    // Check if this pattern is applicable to this file type
+    if (!PatternManager.isPatternSupportedForFileType(pattern, fileExtension)) {
+      // Skip this pattern for this file type
+      return [];
+    }
+
     console.log(
-      `GrepService: Executing pattern "${pattern.name}" on file "${filePath}" (${fileExtension})`
+      `GrepService: Executing pattern "${pattern.name}" on file "${filePath}"`
     );
-
-    // Simple compatibility check for weggli (it only works on C/C++ files)
-    if (pattern.tool === "weggli") {
-      const supportedWeggli = [
-        "c",
-        "cpp",
-        "h",
-        "hpp",
-        "cc",
-        "cxx",
-        "c++",
-        "hxx",
-        "h++",
-      ];
-      if (!supportedWeggli.includes(fileExtension)) {
-        console.log(
-          `GrepService: Skipping weggli pattern on non-C/C++ file (${fileExtension})`
-        );
-        return [];
-      }
-    }
-
-    // Check file type compatibility with pattern
-    if (pattern.supportedFileTypes && pattern.supportedFileTypes.length > 0) {
-      // Skip if pattern doesn't support this file type and doesn't have a wildcard
-      if (
-        !pattern.supportedFileTypes.includes("*") &&
-        !pattern.supportedFileTypes.includes(fileExtension)
-      ) {
-        console.log(
-          `GrepService: Pattern ${pattern.name} doesn't support .${fileExtension} files, skipping`
-        );
-        return [];
-      }
-    }
 
     try {
       // Get the execa function instance

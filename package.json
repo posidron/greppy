@@ -340,6 +340,7 @@
                 "enum": [
                   "info",
                   "warning",
+                  "medium",
                   "critical"
                 ],
                 "default": "warning",
@@ -413,6 +414,7 @@
                   "enum": [
                     "info",
                     "warning",
+                    "medium",
                     "critical"
                   ],
                   "default": "warning",

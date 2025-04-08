@@ -6,8 +6,9 @@ export interface PatternConfig {
   tool: "ripgrep" | "weggli";
   pattern: string;
   options?: string[];
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "warning" | "medium" | "critical";
   supportedFileTypes?: string[]; // Array of file extensions this pattern supports
+  mitigation?: string; // Remediation advice for this security issue
 }
 
 export interface FindingResult {
@@ -16,7 +17,7 @@ export interface FindingResult {
   patternName: string;
   patternDescription: string;
   tool: "ripgrep" | "weggli";
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "warning" | "medium" | "critical";
   filePath: string;
   lineNumber: number;
   matchedContent: string;

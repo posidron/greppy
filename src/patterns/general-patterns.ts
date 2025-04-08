@@ -12,6 +12,8 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     pattern: "(password|api.?key)\\s*=\\s*['\"]([\\w\\W]{5,}?)['\"]",
     severity: "critical",
     supportedFileTypes: ["*"],
+    mitigation:
+      "Use environment variables, secure vaults, or configuration services for sensitive credentials",
   },
   {
     name: "Debug Print Statements",
@@ -20,6 +22,8 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     pattern: "(console\\.log|print|printf|System\\.out\\.print)\\(",
     severity: "info",
     supportedFileTypes: ["*"],
+    mitigation:
+      "Remove debug statements or replace with proper logging that can be configured at runtime",
   },
   {
     name: "Insecure Functions",
@@ -28,5 +32,7 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     pattern: "(eval|exec)\\(",
     severity: "critical",
     supportedFileTypes: ["*"],
+    mitigation:
+      "Avoid dynamic code execution or use safer alternatives with strict input validation",
   },
 ];

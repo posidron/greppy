@@ -103,6 +103,15 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
           alwaysShow: true,
         },
         {
+          label: `${getStatusIcon(this.showWarning)} $(warning) Medium`,
+          description: this.showWarning ? "Showing" : "Hidden", // Using showWarning for medium until we add a dedicated filter
+          picked: this.showWarning,
+          severity: "medium" as const,
+          alwaysShow: true,
+          // Custom icon color will be applied in the QuickPick UI
+          iconPath: this.getSeverityIcon("medium"),
+        },
+        {
           label: `${getStatusIcon(this.showCritical)} $(error) Critical`,
           description: this.showCritical ? "Showing" : "Hidden",
           picked: this.showCritical,
@@ -114,9 +123,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       // Count active filters for the title
       const activeCount = [
         this.showInfo,
-        this.showWarning,
+        this.showWarning, // Counts for both warning and medium
         this.showCritical,
       ].filter(Boolean).length;
+      // We display 4 severity levels but only have 3 actual toggles
       const title = `Filter by Severity (${activeCount}/3 active)`;
 
       const selected = await vscode.window.showQuickPick(items, {
@@ -128,7 +138,9 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       if (selected) {
         // Update filter states based on selection
         this.showInfo = selected.some((item) => item.severity === "info");
-        this.showWarning = selected.some((item) => item.severity === "warning");
+        this.showWarning = selected.some(
+          (item) => item.severity === "warning" || item.severity === "medium"
+        );
         this.showCritical = selected.some(
           (item) => item.severity === "critical"
         );
@@ -214,9 +226,11 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
     // Count enabled filters
     const enabledCount = [
       this.showInfo,
-      this.showWarning,
+      this.showWarning, // Controls both warning and medium severities
       this.showCritical,
     ].filter(Boolean).length;
+    // We have 4 severity levels (info, warning, medium, critical)
+    // but only 3 toggles since medium shares the warning filter
     const totalFilters = 3;
 
     // Set filter display state
@@ -268,12 +282,16 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
     );
 
     // Then apply severity filters
+    // Note: Medium severity is currently grouped with Warning in the UI filter system
+    // This could be expanded in the future to have a dedicated filter toggle
     return nonIgnoredResults.filter((finding) => {
       switch (finding.severity) {
         case "info":
           return this.showInfo;
         case "warning":
           return this.showWarning;
+        case "medium":
+          return this.showWarning; // Using showWarning for medium until we add a dedicated filter
         case "critical":
           return this.showCritical;
         default:
@@ -501,6 +519,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
                 finding.lineNumber - 1,
                 0
               ),
+              // Set a flag to track that we're opening from results
+              // This ensures the right context when we open files
+              preserveFocus: false, // Focus on the editor
+              preview: false, // Open as a regular editor, not a preview
             },
           ],
           title: "Open File",
@@ -516,7 +538,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @returns The icon for the severity
    */
   private getSeverityIcon(
-    severity: "info" | "warning" | "critical"
+    severity: "info" | "warning" | "medium" | "critical"
   ): vscode.ThemeIcon {
     let iconId: string;
     let color: vscode.ThemeColor | undefined;
@@ -529,6 +551,10 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       case "warning":
         iconId = "warning";
         color = new vscode.ThemeColor("charts.yellow");
+        break;
+      case "medium":
+        iconId = "warning";
+        color = new vscode.ThemeColor("charts.orange");
         break;
       case "critical":
         iconId = "error";
@@ -558,13 +584,15 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
    * @returns The ThemeColor for the severity
    */
   private getSeverityColor(
-    severity: "info" | "warning" | "critical"
+    severity: "info" | "warning" | "medium" | "critical"
   ): vscode.ThemeColor {
     switch (severity) {
       case "info":
         return new vscode.ThemeColor("charts.blue");
       case "warning":
         return new vscode.ThemeColor("charts.yellow");
+      case "medium":
+        return new vscode.ThemeColor("charts.orange");
       case "critical":
         return new vscode.ThemeColor("charts.red");
       default:
@@ -582,4 +610,24 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
     // Look through all findings to find the one with the matching ID
     return this.results.find((finding) => finding.id === findingId);
   }
+
+  /**
+   * Check if there are non-empty results available
+   * Used to determine if the current file open is from a manual scan
+   */
+  public hasNonEmptyResults(): boolean {
+    return this.results.length > 0;
+  }
+
+  /**
+   * Get the current results
+   * Used to restore decorations when opening files from results view
+   */
+  public getResults(): FindingResult[] {
+    return this.results;
+  }
+
+  /**
+   * Get code indicator based on file extension
+   */
 }
