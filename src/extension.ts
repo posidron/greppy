@@ -169,10 +169,7 @@ export function activate(context: vscode.ExtensionContext) {
   const editPatternsCommand = vscode.commands.registerCommand(
     "greppy.editPatterns",
     () => {
-      vscode.commands.executeCommand(
-        "workbench.action.openSettings",
-        "greppy.patterns"
-      );
+      vscode.commands.executeCommand("workbench.action.openSettings", "greppy");
     }
   );
 
