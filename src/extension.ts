@@ -101,6 +101,60 @@ export function activate(context: vscode.ExtensionContext) {
               return [];
             }
 
+            // Check if required tools are available
+            const toolCheck = await grepService.checkRequiredTools(patterns);
+
+            // Show warnings if tools are needed but not available
+            if (toolCheck.ripgrepNeeded && !toolCheck.ripgrepAvailable) {
+              const response = await vscode.window.showWarningMessage(
+                "Ripgrep (rg) is required for analysis but was not found. Please install or configure the correct path.",
+                "Configure Path",
+                "Install ripgrep"
+              );
+
+              if (response === "Configure Path") {
+                vscode.commands.executeCommand(
+                  "workbench.action.openSettings",
+                  "greppy.ripgrepPath"
+                );
+                return [];
+              } else if (response === "Install ripgrep") {
+                vscode.env.openExternal(
+                  vscode.Uri.parse(
+                    "https://github.com/BurntSushi/ripgrep#installation"
+                  )
+                );
+                return [];
+              } else {
+                return []; // User canceled
+              }
+            }
+
+            if (toolCheck.weggliNeeded && !toolCheck.weggliAvailable) {
+              const response = await vscode.window.showWarningMessage(
+                "Weggli is required for analysis but was not found. Please install or configure the correct path.",
+                "Configure Path",
+                "Install weggli"
+              );
+
+              if (response === "Configure Path") {
+                vscode.commands.executeCommand(
+                  "workbench.action.openSettings",
+                  "greppy.weggliPath"
+                );
+                return [];
+              } else if (response === "Install weggli") {
+                vscode.env.openExternal(
+                  vscode.Uri.parse(
+                    "https://github.com/weggli-rs/weggli#installation"
+                  )
+                );
+                return [];
+              } else {
+                return []; // User canceled
+              }
+            }
+
             // Show which pattern set is being used
             const activeSet = vscode.workspace
               .getConfiguration("greppy")

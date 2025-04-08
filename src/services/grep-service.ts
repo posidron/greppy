@@ -29,6 +29,78 @@ export class GrepService {
   }
 
   /**
+   * Check if the required tools are installed based on the patterns.
+   *
+   * @param patterns The patterns to check tools for
+   * @returns Object with results of tool checks
+   */
+  async checkRequiredTools(patterns: PatternConfig[]): Promise<{
+    ripgrepNeeded: boolean;
+    weggliNeeded: boolean;
+    ripgrepAvailable: boolean;
+    weggliAvailable: boolean;
+  }> {
+    const result = {
+      ripgrepNeeded: false,
+      weggliNeeded: false,
+      ripgrepAvailable: false,
+      weggliAvailable: false,
+    };
+
+    // Check which tools are needed based on patterns
+    for (const pattern of patterns) {
+      if (pattern.tool === "ripgrep") {
+        result.ripgrepNeeded = true;
+      } else if (pattern.tool === "weggli") {
+        result.weggliNeeded = true;
+      }
+    }
+
+    // If no patterns need a specific tool, no need to check
+    if (!result.ripgrepNeeded && !result.weggliNeeded) {
+      return result;
+    }
+
+    try {
+      const execa = await this.execaPromise;
+
+      // Check ripgrep availability if needed
+      if (result.ripgrepNeeded) {
+        const rgPath = vscode.workspace
+          .getConfiguration("greppy")
+          .get<string>("ripgrepPath", "rg");
+
+        try {
+          await execa(rgPath, ["--version"]);
+          result.ripgrepAvailable = true;
+        } catch (error) {
+          result.ripgrepAvailable = false;
+          console.error("Ripgrep not available:", error);
+        }
+      }
+
+      // Check weggli availability if needed
+      if (result.weggliNeeded) {
+        const weggliPath = vscode.workspace
+          .getConfiguration("greppy")
+          .get<string>("weggliPath", "weggli");
+
+        try {
+          await execa(weggliPath, ["--version"]);
+          result.weggliAvailable = true;
+        } catch (error) {
+          result.weggliAvailable = false;
+          console.error("Weggli not available:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking tool availability:", error);
+    }
+
+    return result;
+  }
+
+  /**
    * Run analysis using the configured patterns.
    *
    * @param workspaceFolder The workspace folder to analyze
@@ -58,9 +130,28 @@ export class GrepService {
       return [];
     }
 
+    // Check for required tools
+    const toolCheck = await this.checkRequiredTools(patterns);
+
+    // Filter out patterns that require missing tools
+    const filteredPatterns = patterns.filter((pattern) => {
+      if (pattern.tool === "ripgrep" && !toolCheck.ripgrepAvailable) {
+        return false;
+      }
+      if (pattern.tool === "weggli" && !toolCheck.weggliAvailable) {
+        return false;
+      }
+      return true;
+    });
+
+    // If all patterns were filtered out, return early
+    if (filteredPatterns.length === 0) {
+      return [];
+    }
+
     const allResults: FindingResult[] = [];
 
-    for (const pattern of patterns) {
+    for (const pattern of filteredPatterns) {
       try {
         const results = await this.executePattern(
           pattern,
@@ -145,6 +236,25 @@ export class GrepService {
       if (error.exitCode === 1 && error.stderr === "") {
         // No matches found is not an error for grep tools
         return [];
+      }
+
+      // Check for specific tool not found errors (ENOENT = file or directory not found)
+      if (error.code === "ENOENT") {
+        if (pattern.tool === "ripgrep") {
+          console.error(
+            `Ripgrep not found at configured path. Pattern "${pattern.name}" skipped.`
+          );
+          throw new Error(
+            `Ripgrep executable not found. Please check your ripgrep installation or configure 'greppy.ripgrepPath'.`
+          );
+        } else if (pattern.tool === "weggli") {
+          console.error(
+            `Weggli not found at configured path. Pattern "${pattern.name}" skipped.`
+          );
+          throw new Error(
+            `Weggli executable not found. Please check your weggli installation or configure 'greppy.weggliPath'.`
+          );
+        }
       }
 
       throw error;
