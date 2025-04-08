@@ -94,9 +94,9 @@ export class PatternManager {
 
     // If user hasn't defined any pattern sets yet, initialize with built-in defaults
     if (Object.keys(patternSets).length === 0) {
-      patternSets["general"] = [];
-      patternSets["cpp"] = [];
-      patternSets["web"] = [];
+      patternSets["general"] = GENERAL_PATTERNS;
+      patternSets["cpp"] = [...GENERAL_PATTERNS, ...CPP_PATTERNS];
+      patternSets["web"] = [...GENERAL_PATTERNS, ...WEB_PATTERNS];
 
       config.update(
         "patternSets",
