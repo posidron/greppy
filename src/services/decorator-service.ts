@@ -393,11 +393,15 @@ export class DecoratorService {
       this.findingsByFilePath.get(filePath)!.push(finding);
     }
 
-    // Apply decorations to the active editor if needed
-    const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor) {
-      this.applyDecorations(activeEditor);
+    // Apply decorations to ALL visible editors, not just the active one
+    for (const editor of vscode.window.visibleTextEditors) {
+      this.applyDecorations(editor);
     }
+
+    // Log a message to confirm findings were processed
+    console.log(
+      `Updating decorations for ${enhancedFindings.length} findings across ${this.findingsByFilePath.size} files`
+    );
   }
 
   /**

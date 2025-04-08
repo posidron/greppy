@@ -11,6 +11,7 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "(password|api.?key)\\s*=\\s*['\"]([\\w\\W]{5,}?)['\"]",
     severity: "critical",
+    supportedFileTypes: ["*"],
   },
   {
     name: "Debug Print Statements",
@@ -18,6 +19,7 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "(console\\.log|print|printf|System\\.out\\.print)\\(",
     severity: "info",
+    supportedFileTypes: ["*"],
   },
   {
     name: "Insecure Functions",
@@ -25,5 +27,6 @@ export const GENERAL_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "(eval|exec)\\(",
     severity: "critical",
+    supportedFileTypes: ["*"],
   },
 ];

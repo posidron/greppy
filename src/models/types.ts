@@ -7,6 +7,7 @@ export interface PatternConfig {
   pattern: string;
   options?: string[];
   severity: "info" | "warning" | "critical";
+  supportedFileTypes?: string[]; // Array of file extensions this pattern supports
 }
 
 export interface FindingResult {

@@ -1,5 +1,18 @@
 import { PatternConfig } from "../models/types";
 
+// C/C++ file extensions
+const CPP_FILE_TYPES = [
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "cc",
+  "cxx",
+  "c++",
+  "hxx",
+  "h++",
+];
+
 /**
  * Security patterns specifically for C/C++ codebases.
  */
@@ -12,6 +25,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     pattern: "(malloc|calloc|realloc)\\(",
     options: ["--pcre2"],
     severity: "warning",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
   {
     name: "Insecure C Functions",
@@ -19,6 +33,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "(strcpy|strcat|gets|sprintf)\\(",
     severity: "critical",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
   {
     name: "Potential Integer Overflow",
@@ -26,6 +41,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "ripgrep",
     pattern: "\\(.*\\s*\\+\\s*.*\\)\\s*\\*|\\*\\s*\\(.*\\s*\\+\\s*.*\\)",
     severity: "warning",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
 
   // Weggli patterns for C/C++
@@ -35,6 +51,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "weggli",
     pattern: "{ _ $buf[_]; memcpy($buf,_,_); }",
     severity: "critical",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
   {
     name: "Missing NULL Check",
@@ -42,6 +59,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "weggli",
     pattern: "{ _* $p; not: if ($p == NULL) _; not: if ($p != NULL) _; *$p; }",
     severity: "warning",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
   {
     name: "Use After Free Risk",
@@ -49,6 +67,7 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "weggli",
     pattern: "{ free($p); _($p); }",
     severity: "critical",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
   {
     name: "Uninitalized Variable Usage",
@@ -56,5 +75,6 @@ export const CPP_PATTERNS: PatternConfig[] = [
     tool: "weggli",
     pattern: "{ _* $p; NOT: $p = _; $func(&$p); }",
     severity: "warning",
+    supportedFileTypes: CPP_FILE_TYPES,
   },
 ];

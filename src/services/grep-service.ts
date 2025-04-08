@@ -188,6 +188,10 @@ export class GrepService {
     const results: FindingResult[] = [];
     const timestamp = Date.now();
 
+    console.log(
+      `GrepService: Executing pattern "${pattern.name}" on workspace "${workspacePath}"`
+    );
+
     try {
       // Get the execa function instance
       const execa = await this.execaPromise;
@@ -258,6 +262,152 @@ export class GrepService {
       }
 
       throw error;
+    }
+
+    return results;
+  }
+
+  /**
+   * Execute a single pattern against a specific file path.
+   *
+   * @param pattern The pattern configuration
+   * @param filePath The path to the specific file to analyze
+   * @returns Promise with the search results
+   */
+  async executePatternOnPath(
+    pattern: PatternConfig,
+    filePath: string
+  ): Promise<FindingResult[]> {
+    const results: FindingResult[] = [];
+    const timestamp = Date.now();
+
+    // Get file extension
+    const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";
+
+    console.log(
+      `GrepService: Executing pattern "${pattern.name}" on file "${filePath}" (${fileExtension})`
+    );
+
+    // Simple compatibility check for weggli (it only works on C/C++ files)
+    if (pattern.tool === "weggli") {
+      const supportedWeggli = [
+        "c",
+        "cpp",
+        "h",
+        "hpp",
+        "cc",
+        "cxx",
+        "c++",
+        "hxx",
+        "h++",
+      ];
+      if (!supportedWeggli.includes(fileExtension)) {
+        console.log(
+          `GrepService: Skipping weggli pattern on non-C/C++ file (${fileExtension})`
+        );
+        return [];
+      }
+    }
+
+    // Check file type compatibility with pattern
+    if (pattern.supportedFileTypes && pattern.supportedFileTypes.length > 0) {
+      // Skip if pattern doesn't support this file type and doesn't have a wildcard
+      if (
+        !pattern.supportedFileTypes.includes("*") &&
+        !pattern.supportedFileTypes.includes(fileExtension)
+      ) {
+        console.log(
+          `GrepService: Pattern ${pattern.name} doesn't support .${fileExtension} files, skipping`
+        );
+        return [];
+      }
+    }
+
+    try {
+      // Get the execa function instance
+      const execa = await this.execaPromise;
+
+      if (pattern.tool === "ripgrep") {
+        const rgPath = vscode.workspace
+          .getConfiguration("greppy")
+          .get<string>("ripgrepPath", "rg");
+
+        // Build command args specifically for this file
+        const args = [
+          "--line-number",
+          "--no-heading",
+          "--color",
+          "never",
+          ...(pattern.options || []),
+          pattern.pattern,
+          filePath, // Directly target the specific file
+        ];
+
+        // Execute ripgrep
+        try {
+          console.log(
+            `GrepService: Running command: ${rgPath} ${args.join(" ")}`
+          );
+          const { stdout } = await execa(rgPath, args);
+          // Parse the output
+          results.push(...this.parseRipgrepOutput(stdout, pattern, timestamp));
+        } catch (error: any) {
+          // Handle expected errors like "no matches found"
+          if (error.exitCode === 1 && error.stderr === "") {
+            // No matches found is not an error for grep tools
+            return [];
+          }
+
+          // Display more information about the error but don't throw
+          console.error(`Error running ripgrep on ${filePath}:`, error);
+          return []; // Return empty results to avoid breaking the auto-scan
+        }
+      } else if (pattern.tool === "weggli") {
+        const weggliPath = vscode.workspace
+          .getConfiguration("greppy")
+          .get<string>("weggliPath", "weggli");
+
+        // Build command args specifically for this file
+        const args = [
+          ...(pattern.options || []),
+          pattern.pattern,
+          filePath, // Directly target the specific file
+        ];
+
+        // Execute weggli
+        try {
+          console.log(
+            `GrepService: Running command: ${weggliPath} ${args.join(" ")}`
+          );
+          const { stdout } = await execa(weggliPath, args);
+          // Parse the output
+          results.push(...this.parseWeggliOutput(stdout, pattern, timestamp));
+        } catch (error: any) {
+          // Handle expected errors like "no matches found"
+          if (error.exitCode === 1 && error.stderr === "") {
+            // No matches found is not an error for weggli
+            return [];
+          }
+
+          // Display more information about the error but don't throw
+          console.error(`Error running weggli on ${filePath}:`, error);
+          return []; // Return empty results to avoid breaking the auto-scan
+        }
+      }
+    } catch (error: any) {
+      // Check for specific tool not found errors (ENOENT = file or directory not found)
+      if (error.code === "ENOENT") {
+        console.error(`Tool not found when analyzing ${filePath}`);
+        return []; // Return empty results instead of throwing
+      }
+      console.error(`Error executing pattern on path ${filePath}:`, error);
+      return []; // Return empty results to avoid breaking the auto-scan
+    }
+
+    if (results.length > 0) {
+      console.log(
+        `GrepService: Found ${results.length} results for pattern "${pattern.name}" in file "${filePath}"`
+      );
     }
 
     return results;

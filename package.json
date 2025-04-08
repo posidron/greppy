@@ -17,9 +17,8 @@
   },
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:greppyResults",
-    "onCommand:greppy.runAnalysis",
-    "onCommand:greppy.ignoreFinding"
+    "onStartupFinished",
+    "onLanguage:*"
   ],
   "contributes": {
     "commands": [
@@ -150,6 +149,12 @@
         "title": "Greppy: Manage Ignored Findings",
         "category": "Greppy",
         "icon": "$(eye-closed)"
+      },
+      {
+        "command": "greppy.autoScanOpenFiles",
+        "title": "Greppy: Auto-Scan Open Files",
+        "category": "Greppy",
+        "icon": "$(search)"
       }
     ],
     "keybindings": [
@@ -224,6 +229,11 @@
           "command": "greppy.manageIgnoredFindings",
           "when": "view == greppyResults",
           "group": "navigation"
+        },
+        {
+          "command": "greppy.autoScanOpenFiles",
+          "when": "view == greppyResults",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -276,6 +286,9 @@
         },
         {
           "command": "greppy.manageIgnoredFindings"
+        },
+        {
+          "command": "greppy.autoScanOpenFiles"
         }
       ]
     },
@@ -331,6 +344,13 @@
                 ],
                 "default": "warning",
                 "description": "Severity level of findings for this pattern"
+              },
+              "supportedFileTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "File extensions this pattern should be applied to. Use '*' for all file types."
               }
             }
           }
@@ -397,6 +417,13 @@
                   ],
                   "default": "warning",
                   "description": "Severity level of findings for this pattern"
+                },
+                "supportedFileTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "File extensions this pattern should be applied to. Use '*' for all file types."
                 }
               }
             }
@@ -416,6 +443,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable AI-powered analysis of security findings in hover information"
+        },
+        "greppy.enableAutoScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan files when they are opened based on their file extension"
         }
       }
     }
