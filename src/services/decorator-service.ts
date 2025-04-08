@@ -3,6 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 // Re-importing with a slightly different format to clear any potential caching issues
 import type { FindingResult, IgnoredFinding } from "../models/types";
+import { AIService } from "./ai-service";
 import { IdService } from "./id-service";
 
 /**
@@ -29,6 +30,12 @@ export class DecoratorService {
 
   // In-memory cache of ignored findings by workspace folder
   private ignoredFindingsByWorkspace: Map<string, IgnoredFinding[]> = new Map();
+
+  // AI service for explanations
+  private aiService: AIService;
+
+  // Cache for AI explanations to avoid repeated requests
+  private explanationCache: Map<string, string> = new Map();
 
   constructor(private context?: vscode.ExtensionContext) {
     // Listen for active editor changes to apply decorations
@@ -58,22 +65,33 @@ export class DecoratorService {
       context.subscriptions.push(
         vscode.commands.registerCommand(
           "greppy.ignoreFinding",
-          (findingId: string) => {
-            this.ignoreFinding(findingId);
+          async (findingId: string) => {
+            await this.ignoreFinding(findingId);
           }
         )
       );
 
       // Register command to manage ignored findings
       context.subscriptions.push(
-        vscode.commands.registerCommand("greppy.manageIgnoredFindings", () => {
-          this.showIgnoredFindingsManager();
-        })
+        vscode.commands.registerCommand(
+          "greppy.manageIgnoredFindings",
+          async () => {
+            await this.showIgnoredFindingsManager();
+          }
+        )
       );
     }
 
     // Load ignored findings for each workspace folder
     this.loadIgnoredFindings();
+
+    // Initialize AI service
+    this.aiService = new AIService();
+
+    // Apply decorations to all open editors
+    vscode.window.visibleTextEditors.forEach((editor) => {
+      this.applyDecorations(editor);
+    });
   }
 
   /**
@@ -654,10 +672,10 @@ export class DecoratorService {
    * @param position The position in the document
    * @returns Hover information if there's a finding at the position
    */
-  private provideHoverForFinding(
+  private async provideHoverForFinding(
     document: vscode.TextDocument,
     position: vscode.Position
-  ): vscode.Hover | undefined {
+  ): Promise<vscode.Hover | undefined> {
     const filePath = document.uri.fsPath;
     const findings = this.findingsByFilePath.get(filePath);
 
@@ -672,10 +690,39 @@ export class DecoratorService {
       return undefined;
     }
 
+    // Check if AI analysis is enabled in settings
+    const isAiAnalysisEnabled = vscode.workspace
+      .getConfiguration("greppy")
+      .get<boolean>("enableAiAnalysis", true);
+
+    // Only fetch AI explanation if enabled
+    let aiExplanation: string | undefined;
+    if (isAiAnalysisEnabled) {
+      // Try to get AI explanation if it's not in the cache
+      const cacheKey = `${finding.patternName}-${finding.matchedContent}`;
+      aiExplanation = this.explanationCache.get(cacheKey);
+
+      // If explanation isn't cached, fetch it now before creating the hover content
+      if (!aiExplanation) {
+        try {
+          aiExplanation = await this.aiService.getExplanation(finding);
+
+          // Cache the explanation if we got one
+          if (aiExplanation) {
+            this.explanationCache.set(cacheKey, aiExplanation);
+          }
+        } catch (error) {
+          console.error("Error getting AI explanation:", error);
+          aiExplanation = "Error loading AI analysis. Please try again.";
+        }
+      }
+    }
+
     // Create hover content with markdown
     const hoverContent = new vscode.MarkdownString(undefined, true);
     hoverContent.isTrusted = true;
 
+    // Add a bit of whitespace to make the hover larger
     hoverContent.appendMarkdown(`### ${finding.patternName}\n\n`);
     hoverContent.appendMarkdown(`**Severity**: ${finding.severity}\n\n`);
     hoverContent.appendMarkdown(
@@ -686,14 +733,29 @@ export class DecoratorService {
     );
     hoverContent.appendMarkdown(`**Tool**: ${finding.tool}\n\n`);
 
+    // Add the AI explanation only if enabled
+    if (isAiAnalysisEnabled) {
+      hoverContent.appendMarkdown(
+        `**AI Analysis**: ${aiExplanation || "Not available at this time."}\n\n`
+      );
+    }
+
+    // Add spacer to increase hover height
+    hoverContent.appendMarkdown(`---\n\n`);
+
     // Add command link to ignore this finding
     hoverContent.appendMarkdown(
-      `[Ignore this issue](command:greppy.ignoreFinding?${encodeURIComponent(
+      `[$(eye-closed) Ignore this issue](command:greppy.ignoreFinding?${encodeURIComponent(
         JSON.stringify(finding.id)
       )})`
     );
 
-    return new vscode.Hover(hoverContent);
+    // Add more whitespace at the bottom
+    hoverContent.appendMarkdown(`\n\n`);
+
+    // Use a large range to make the hover bigger
+    const lineRange = document.lineAt(position.line).range;
+    return new vscode.Hover(hoverContent, lineRange);
   }
 
   /**

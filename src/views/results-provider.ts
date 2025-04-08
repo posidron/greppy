@@ -35,6 +35,12 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
 
     // Register commands for toggling severity filters
     this.registerFilterCommands();
+
+    // Register a command to get a finding by ID
+    vscode.commands.registerCommand(
+      "greppy.getFindingById",
+      (findingId: string) => this.getFindingById(findingId)
+    );
   }
 
   /**
@@ -481,6 +487,7 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
         tooltip: `${finding.filePath}:${finding.lineNumber}\n${finding.matchedContent}\nSeverity: ${finding.severity}`,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         finding,
+        contextValue: "finding",
         iconPath: this.getSeverityIcon(finding.severity),
         resourceUri: vscode.Uri.parse(`greppy:finding/${finding.severity}`),
         command: {
@@ -563,5 +570,16 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
       default:
         return new vscode.ThemeColor("foreground");
     }
+  }
+
+  /**
+   * Get a finding by its ID.
+   *
+   * @param findingId The ID of the finding to retrieve
+   * @returns The finding with the specified ID, or undefined if not found
+   */
+  private getFindingById(findingId: string): FindingResult | undefined {
+    // Look through all findings to find the one with the matching ID
+    return this.results.find((finding) => finding.id === findingId);
   }
 }

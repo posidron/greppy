@@ -270,14 +270,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  // Register a command to fix findings with Copilot
-  const fixWithCopilotCommand = vscode.commands.registerCommand(
-    "greppy.fixWithCopilot",
-    async () => {
-      // Implementation of the command
-    }
-  );
-
   // Register the commands
   context.subscriptions.push(runAnalysisCommand);
   context.subscriptions.push(refreshResultsCommand);
@@ -288,7 +280,6 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(refreshResultsTreeCommand);
   context.subscriptions.push(addPatternToSetCommand);
   context.subscriptions.push(manageIgnoredFindingsCommand);
-  context.subscriptions.push(fixWithCopilotCommand);
 
   // Create an initial status bar item as another way to access the extension
   const statusBarItem = vscode.window.createStatusBarItem(
