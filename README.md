@@ -12,6 +12,10 @@
   <img src="images/greppy-screenshot.png" alt="Greppy Screenshot" width="800"/>
 </p>
 
+<p align="center">
+  <img src="images/greppy-settings.png" alt="Greppy Screenshot" width="800"/>
+</p>
+
 <div align="center">
   <a href="#-features">Features</a> •
   <a href="#-requirements">Requirements</a> •
