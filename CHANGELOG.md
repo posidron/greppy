@@ -2,6 +2,8 @@
 
 ## [v0.0.2]
 
+- Add Pattern Manager to disable rules
+- Add auto scan for open files
 - Add AI analysis of found issues on hover
 - Check if weggli and ripgrep are installed
 - Remove Welcome to Greppy from side panel

@@ -2,7 +2,7 @@
   "name": "greppy",
   "displayName": "Greppy",
   "description": "A continuous static analysis tool with focus on security",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Mantiqo",
   "icon": "images/logo-alpha.png",
   "engines": {
