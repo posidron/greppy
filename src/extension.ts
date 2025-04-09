@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { PatternManager } from "./patterns/pattern-manager";
 import { DecoratorService } from "./services/decorator-service";
 import { GrepService } from "./services/grep-service";
+import { PatternsProvider, PatternTreeItem } from "./views/patterns-provider";
 import { GrepResultsProvider } from "./views/results-provider";
 
 // This method is called when your extension is activated
@@ -18,16 +19,63 @@ export function activate(context: vscode.ExtensionContext) {
   const grepService = new GrepService(context);
   const decoratorService = new DecoratorService(context);
   const resultsProvider = new GrepResultsProvider(context, decoratorService);
+  const patternsProvider = new PatternsProvider(context);
 
-  // Register the tree data provider
-  const treeView = vscode.window.createTreeView("greppyResults", {
+  // Register the results tree data provider
+  const resultsTreeView = vscode.window.createTreeView("greppyResults", {
     treeDataProvider: resultsProvider,
     showCollapseAll: true,
   });
-  context.subscriptions.push(treeView);
+  context.subscriptions.push(resultsTreeView);
 
-  // Initialize the view with empty results
+  // Register the patterns tree data provider
+  const patternsTreeView = vscode.window.createTreeView("greppyPatterns", {
+    treeDataProvider: patternsProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(patternsTreeView);
+
+  // Initialize the results view with empty results
   resultsProvider.update([], []);
+
+  // Register the toggle pattern command
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "greppy.togglePattern",
+      async (patternItem: PatternTreeItem) => {
+        const wasEnabled = patternItem.isEnabled;
+        const patternName = patternItem.pattern.name;
+
+        await patternsProvider.togglePattern(patternItem);
+
+        // After toggling a pattern, update the results to filter out findings from disabled patterns
+        const disabledPatterns = patternsProvider.getDisabledPatterns();
+        const allResults = resultsProvider.getResults();
+
+        // Filter out results from disabled patterns
+        const filteredResults = allResults.filter(
+          (result: any) => !disabledPatterns.includes(result.patternName)
+        );
+
+        // Get the active patterns (without disabled ones)
+        const patterns = PatternManager.getPatterns(context);
+
+        // Update the results view
+        await resultsProvider.update(filteredResults, patterns, false);
+
+        // Show notification to user
+        if (wasEnabled) {
+          vscode.window.showInformationMessage(
+            `Pattern "${patternName}" disabled. Results have been updated.`
+          );
+        } else {
+          vscode.window.showInformationMessage(
+            `Pattern "${patternName}" enabled.`
+          );
+        }
+      }
+    )
+  );
 
   // Ensure that all components are properly initialized before beginning auto-scan
   let extensionReady = false;
@@ -59,18 +107,16 @@ export function activate(context: vscode.ExtensionContext) {
             .getConfiguration("greppy")
             .get<boolean>("enableAutoScan", true);
 
-          // Check if this is a file opening as a result of clicking a result
-          const isFromManualScan = resultsProvider.hasNonEmptyResults();
-
-          if (isAutoScanEnabled && !isFromManualScan) {
-            // Only auto-scan if this isn't from clicking a result in the results panel
+          if (isAutoScanEnabled) {
+            // Always auto-scan newly opened files when the setting is enabled
             scanSingleFile(document);
-          } else if (isFromManualScan) {
-            // If we're opening a file from results view, just apply decorations
-            // without rescanning or replacing the results
+          } else {
+            // If auto-scan is disabled but we have results, apply existing decorations
             const results = resultsProvider.getResults();
             decoratorService.updateFindings(results);
-            console.log("Applied existing findings to newly opened document");
+            console.log(
+              "Auto-scan disabled, but applied existing findings to newly opened document"
+            );
           }
         }
       );
@@ -84,19 +130,15 @@ export function activate(context: vscode.ExtensionContext) {
               .getConfiguration("greppy")
               .get<boolean>("enableAutoScan", true);
 
-            // Check if this is from a manual scan to avoid overriding results
-            const isFromManualScan = resultsProvider.hasNonEmptyResults();
-
-            if (isAutoScanEnabled && !isFromManualScan) {
-              // Only auto-scan if this isn't from clicking a result in the results panel
+            // Always allow auto-scan when switching between files
+            if (isAutoScanEnabled) {
               const document = editor.document;
               console.log(`Editor changed to: ${document.fileName}`);
               scanSingleFile(document);
-            } else if (isFromManualScan) {
-              // If we're navigating between files from results view, just apply decorations
-              // without rescanning or replacing the results
+            } else {
+              // If auto-scan is disabled but we still have results, apply existing decorations
               console.log(
-                "Editor changed but manual scan results exist - preserving results"
+                "Auto-scan disabled, but applying existing decorations"
               );
               const results = resultsProvider.getResults();
               decoratorService.updateFindings(results);
@@ -127,7 +169,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Function to determine appropriate patterns for a file based on its extension
   const getPatternsForFile = (filePath: string): any[] => {
     // Use the new pattern manager method to get patterns for this file
-    return PatternManager.getPatternsForFile(filePath);
+    return PatternManager.getPatternsForFile(filePath, context);
   };
 
   // Function to scan a single file
@@ -152,7 +194,7 @@ export function activate(context: vscode.ExtensionContext) {
         return; // Skip files not in a workspace
       }
 
-      // Get patterns for this file
+      // Get patterns for this file, respecting disabled patterns
       const patternsToUse = getPatternsForFile(document.uri.fsPath);
       if (patternsToUse.length === 0) {
         return; // No patterns to use
@@ -169,7 +211,7 @@ export function activate(context: vscode.ExtensionContext) {
       try {
         const results = await grepService.runAnalysis(
           workspaceFolder,
-          patternsToUse
+          PatternManager.getPatterns(context)
         );
 
         // Get the absolute path in a normalized form for comparison
@@ -250,8 +292,8 @@ export function activate(context: vscode.ExtensionContext) {
           `Applying ${fileResults.length} findings for ${document.fileName} to UI`
         );
 
-        // First update the results provider
-        await resultsProvider.update(fileResults, patternsToUse);
+        // Always replace the results with the new findings for this file
+        await resultsProvider.update(fileResults, patternsToUse, true);
         console.log(
           "Updating results provider with",
           fileResults.length,
@@ -296,7 +338,7 @@ export function activate(context: vscode.ExtensionContext) {
       async (progress, token) => {
         // Start with empty results
         let allResults: any[] = [];
-        const allPatterns = PatternManager.getPatterns();
+        const allPatterns = PatternManager.getPatterns(context);
 
         // Check for tool availability first
         const toolCheck = await grepService.checkRequiredTools(allPatterns);
@@ -471,12 +513,12 @@ export function activate(context: vscode.ExtensionContext) {
             // Run the analysis with the patterns
             const results = await grepService.runAnalysis(
               workspaceFolder,
-              patterns
+              PatternManager.getPatterns(context)
             );
 
             // Update the tree view and decorations with the same set of results
             // The decorator service will filter out ignored findings internally
-            await resultsProvider.update(results, patterns);
+            await resultsProvider.update(results, patterns, false);
             await decoratorService.updateFindings(results);
 
             // Show a summary notification
@@ -485,7 +527,7 @@ export function activate(context: vscode.ExtensionContext) {
             );
 
             // Focus the tree view
-            if (treeView.visible) {
+            if (resultsTreeView.visible) {
               // Only try to reveal if the tree view is visible
               // This will also focus the view
               vscode.commands.executeCommand("greppyResults.focus");

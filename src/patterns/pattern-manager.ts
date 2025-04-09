@@ -37,7 +37,9 @@ export class PatternManager {
    * Get all patterns based on current configuration.
    * Combines the active pattern set with user's custom patterns.
    */
-  public static getPatterns(): PatternConfig[] {
+  public static getPatterns(
+    context?: vscode.ExtensionContext
+  ): PatternConfig[] {
     // Get custom patterns from user settings
     const customPatterns = vscode.workspace
       .getConfiguration("greppy")
@@ -86,7 +88,22 @@ export class PatternManager {
       (p) => !patternNames.has(p.name)
     );
 
-    return [...builtInPatterns, ...validCustomPatterns];
+    let allPatterns = [...builtInPatterns, ...validCustomPatterns];
+
+    // Filter out disabled patterns if context is provided
+    if (context) {
+      const disabledPatterns = context.workspaceState.get<string[]>(
+        "greppyDisabledPatterns",
+        []
+      );
+      if (disabledPatterns.length > 0) {
+        allPatterns = allPatterns.filter(
+          (pattern) => !disabledPatterns.includes(pattern.name)
+        );
+      }
+    }
+
+    return allPatterns;
   }
 
   /**
@@ -151,14 +168,18 @@ export class PatternManager {
   /**
    * Get patterns applicable for a specific file
    * @param filePath Path to the file
+   * @param context Extension context for checking disabled patterns
    * @returns Array of patterns applicable to the file
    */
-  public static getPatternsForFile(filePath: string): PatternConfig[] {
+  public static getPatternsForFile(
+    filePath: string,
+    context?: vscode.ExtensionContext
+  ): PatternConfig[] {
     // Get the file extension
     const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";
 
     // Get all available patterns from the active pattern set
-    const allPatterns = PatternManager.getPatterns();
+    const allPatterns = PatternManager.getPatterns(context);
 
     // Filter patterns to only those applicable to this file type
     const applicablePatterns = allPatterns.filter((pattern) =>

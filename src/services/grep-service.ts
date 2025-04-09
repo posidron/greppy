@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
 import * as vscode from "vscode";
-import { DEFAULT_PATTERNS } from "../default-config";
 import { FindingResult, PatternConfig } from "../models/types";
 import { COMMON_FILE_TYPES, PatternManager } from "../patterns/pattern-manager";
 import { IdService } from "./id-service";
@@ -102,27 +101,38 @@ export class GrepService {
   }
 
   /**
-   * Run analysis using the configured patterns.
-   *
+   * Runs a security analysis on the workspace using ripgrep and weggli.
    * @param workspaceFolder The workspace folder to analyze
-   * @param patterns Optional patterns to use instead of those from settings
-   * @returns Promise with the analysis results
+   * @param patterns Optional list of patterns to use. If not provided, will use the active pattern set.
+   * @returns Array of findings
    */
-  async runAnalysis(
+  public async runAnalysis(
     workspaceFolder: vscode.WorkspaceFolder,
     patterns?: PatternConfig[]
   ): Promise<FindingResult[]> {
-    // If patterns aren't provided, get them from settings
+    // If no patterns were supplied, get them from the pattern manager
     if (!patterns) {
-      patterns = vscode.workspace
-        .getConfiguration("greppy")
-        .get<PatternConfig[]>("patterns", []);
-
-      // If still no patterns, use defaults
-      if (patterns.length === 0) {
-        patterns = DEFAULT_PATTERNS;
-      }
+      patterns = PatternManager.getPatterns(this.context);
     }
+
+    // Filter out disabled patterns
+    const disabledPatterns = this.context.workspaceState.get<string[]>(
+      "greppyDisabledPatterns",
+      []
+    );
+    if (disabledPatterns.length > 0) {
+      patterns = patterns.filter(
+        (pattern) => !disabledPatterns.includes(pattern.name)
+      );
+    }
+
+    // Log the active pattern set and number of patterns
+    const activeSet = vscode.workspace
+      .getConfiguration("greppy")
+      .get<string>("activePatternSet", "general");
+    console.log(
+      `Running security analysis with ${patterns.length} patterns from set "${activeSet}"`
+    );
 
     if (patterns.length === 0) {
       vscode.window.showInformationMessage(
@@ -405,6 +415,18 @@ export class GrepService {
   ): Promise<FindingResult[]> {
     const results: FindingResult[] = [];
     const timestamp = Date.now();
+
+    // Check if pattern is disabled
+    const disabledPatterns = this.context.workspaceState.get<string[]>(
+      "greppyDisabledPatterns",
+      []
+    );
+    if (disabledPatterns.includes(pattern.name)) {
+      console.log(
+        `GrepService: Skipping disabled pattern "${pattern.name}" on file "${filePath}"`
+      );
+      return [];
+    }
 
     // Extract the file extension
     const fileExtension = filePath.split(".").pop()?.toLowerCase() || "";

@@ -301,17 +301,40 @@ export class GrepResultsProvider implements vscode.TreeDataProvider<TreeItem> {
   }
 
   /**
-   * Update the results shown in the TreeView.
+   * Update the results and patterns.
+   * If isAutoScan is true, it will only replace results for the files in the current results.
    *
-   * @param results The results to display
-   * @param patterns The patterns used for the results
+   * @param newResults The new results to display
+   * @param patterns The patterns used to get these results
+   * @param isAutoScan Whether this is an auto-scan of a single file (default: false)
    */
   async update(
-    results: FindingResult[],
-    patterns: PatternConfig[]
+    newResults: FindingResult[],
+    patterns: PatternConfig[],
+    isAutoScan: boolean = false
   ): Promise<void> {
-    // Store the full results set
-    this.results = results;
+    if (isAutoScan && newResults.length > 0) {
+      // For auto-scan, get the filePath of the scanned file
+      const scannedFilePath = newResults[0].filePath;
+
+      // Filter out previous results for the same file(s)
+      this.results = this.results.filter(
+        (result) =>
+          !newResults.some(
+            (newResult) =>
+              path.normalize(result.filePath) ===
+              path.normalize(newResult.filePath)
+          )
+      );
+
+      // Add new results
+      this.results = [...this.results, ...newResults];
+    } else {
+      // For manual scans, replace all results
+      this.results = newResults;
+    }
+
+    // Update patterns
     this.patterns = new Map(patterns.map((pattern) => [pattern.name, pattern]));
 
     // Determine if we should show the welcome view based on filtered results

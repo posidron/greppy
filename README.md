@@ -185,6 +185,17 @@ This will add your pattern to the built-in C++ patterns rather than replacing th
 5. Click on findings to navigate to the corresponding code
 6. Hover over a finding to see more details or ignore it if it's not relevant
 
+### 🧩 Disabling Patterns
+
+You can easily disable specific patterns that produce too much noise or false positives:
+
+1. Open the "Pattern Management" view in the Greppy panel
+2. Right-click on any pattern and select "Toggle Pattern Enabled/Disabled"
+3. Disabled patterns won't be used in subsequent analyses
+4. Toggle the pattern again to re-enable it
+
+All pattern enable/disable settings are stored at the workspace level, so different projects can have different patterns enabled.
+
 ## 👨‍💻 Extension Development
 
 ### 🏗️ Building and Packaging

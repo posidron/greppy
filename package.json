@@ -155,6 +155,10 @@
         "title": "Greppy: Auto-Scan Open Files",
         "category": "Greppy",
         "icon": "$(search)"
+      },
+      {
+        "command": "greppy.togglePattern",
+        "title": "Toggle Pattern Enabled/Disabled"
       }
     ],
     "keybindings": [
@@ -168,18 +172,21 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "greppy-container",
+          "id": "greppy-explorer",
           "title": "Greppy",
           "icon": "$(shield)"
         }
       ]
     },
     "views": {
-      "greppy-container": [
+      "greppy-explorer": [
         {
           "id": "greppyResults",
-          "name": "Security Analysis Results",
-          "icon": "$(shield)"
+          "name": "Analysis Results"
+        },
+        {
+          "id": "greppyPatterns",
+          "name": "Pattern Management"
         }
       ]
     },
@@ -289,6 +296,13 @@
         },
         {
           "command": "greppy.autoScanOpenFiles"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "greppy.togglePattern",
+          "when": "view == greppyPatterns",
+          "group": "inline"
         }
       ]
     },
